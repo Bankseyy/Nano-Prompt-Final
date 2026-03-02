@@ -79,7 +79,13 @@ textarea{
  </div>
 
  <div class="panel">
-  <div class="panel-header"><strong>Live Output</strong></div>
+  <div class="panel-header">
+   <strong>Live Output</strong>
+   <div>
+    <button id="copyBtn">Copy</button>
+    <button id="downloadRefBtn">Download Reference</button>
+   </div>
+  </div>
   <div class="panel-body">
    <textarea id="output"></textarea>
    <div id="thumb" class="thumbnail">
@@ -151,8 +157,10 @@ function render(){
  if(p.reference){
    thumb.style.display="block";
    thumbImg.src=p.reference;
+   downloadRefBtn.disabled=false;
  }else{
    thumb.style.display="none";
+   downloadRefBtn.disabled=true;
  }
 }
 
@@ -172,6 +180,19 @@ function renderOutput(){
  output.style.height="auto";
  output.style.height=output.scrollHeight+"px";
 }
+
+copyBtn.onclick=()=>{
+ navigator.clipboard.writeText(output.value);
+};
+
+downloadRefBtn.onclick=()=>{
+ let p=currentPreset();
+ if(!p.reference) return;
+ let a=document.createElement("a");
+ a.href=p.reference;
+ a.download="reference.png";
+ a.click();
+};
 
 presetSelect.onchange=()=>{
  values={};
