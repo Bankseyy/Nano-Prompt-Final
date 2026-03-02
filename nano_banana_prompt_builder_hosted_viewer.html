@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Nano Banana Prompt Builder (Hosted Viewer)</title>
+
+<style>
+:root{
+ --bg:#0b0f0c;
+ --panel:#0f1712;
+ --text:#e7f2ea;
+ --muted:#9fb1a6;
+ --border:#1c2b22;
+ --accent:#2fe36b;
+ --radius:14px;
+ --mono:ui-monospace, Menlo, Consolas, monospace;
+ --sans:system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}
+.wrap{max-width:1300px;margin:20px auto;padding:0 16px}
+
+.topbar{
+ display:flex;justify-content:space-between;align-items:center;gap:12px;
+ padding:14px;border:1px solid var(--border);
+ border-radius:var(--radius);background:var(--panel);flex-wrap:wrap
+}
+
+select,input,textarea,button{
+ font:inherit;color:inherit;
+ background:#111a14;border:1px solid var(--border);
+ border-radius:10px;padding:8px 10px;
+}
+
+button:hover{border-color:var(--accent)}
+
+.grid{display:grid;grid-template-columns:360px 1fr;gap:14px;margin-top:14px}
+
+.panel{border:1px solid var(--border);border-radius:var(--radius);background:var(--panel)}
+.panel-header{
+ padding:12px;border-bottom:1px solid var(--border);
+ display:flex;justify-content:space-between;align-items:center
+}
+.panel-body{padding:12px}
+
+.vars{display:flex;flex-direction:column;gap:10px;max-height:72vh;overflow:auto}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;color:var(--muted)}
+
+textarea{
+ width:100%;min-height:340px;resize:none;
+ font-family:var(--mono);white-space:pre-wrap
+}
+
+.thumbnail{
+ margin-top:12px;border:1px solid var(--border);
+ border-radius:10px;padding:8px;display:none;background:#111a14
+}
+.thumbnail img{max-width:100%;border-radius:8px}
+
+.notice{color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<div class="topbar">
+ <strong>Nano Banana Prompt Builder</strong>
+ <span class="notice">Hosted Viewer (reads presets.json)</span>
+ <select id="presetSelect"></select>
+</div>
+
+<div class="grid">
+ <div class="panel">
+  <div class="panel-header"><strong>Variables</strong></div>
+  <div class="panel-body"><div class="vars" id="vars"></div></div>
+ </div>
+
+ <div class="panel">
+  <div class="panel-header"><strong>Live Output</strong></div>
+  <div class="panel-body">
+   <textarea id="output"></textarea>
+   <div id="thumb" class="thumbnail">
+     <strong style="font-size:12px;color:var(--muted)">Reference Preview</strong>
+     <img id="thumbImg">
+   </div>
+  </div>
+ </div>
+</div>
+
+</div>
+
+<script>
+let data=null;
+let values={};
+
+async function loadPresets(){
+ try{
+   const res = await fetch("presets.json", {cache:"no-store"});
+   if(!res.ok) throw new Error("presets.json not found");
+   data = await res.json();
+   init();
+ }catch(e){
+   alert("Could not load presets.json. Make sure it exists in the repo root.");
+ }
+}
+
+function init(){
+ presetSelect.innerHTML="";
+ data.presets.forEach(p=>{
+   let o=document.createElement("option");
+   o.value=p.id;
+   o.textContent=p.name;
+   presetSelect.appendChild(o);
+ });
+ render();
+}
+
+function currentPreset(){
+ return data.presets.find(p=>p.id===presetSelect.value);
+}
+
+function detectVars(t){
+ const r=/\[([^\]]+)\]/g;let m,v=[];
+ while((m=r.exec(t))) if(!v.includes(m[1])) v.push(m[1]);
+ return v;
+}
+
+function render(){
+ let p=currentPreset();
+ if(!p) return;
+
+ vars.innerHTML="";
+ let varsList=detectVars(p.template);
+
+ varsList.forEach(name=>{
+   let div=document.createElement("div");div.className="field";
+   let label=document.createElement("label");label.textContent=name;
+   let input=document.createElement("input");
+   input.value=values[name]||"";
+   input.oninput=()=>{values[name]=input.value;renderOutput();};
+   div.appendChild(label);
+   div.appendChild(input);
+   vars.appendChild(div);
+ });
+
+ renderOutput();
+
+ if(p.reference){
+   thumb.style.display="block";
+   thumbImg.src=p.reference;
+ }else{
+   thumb.style.display="none";
+ }
+}
+
+function renderOutput(){
+ let p=currentPreset();
+ let text=p.template;
+
+ detectVars(p.template).forEach(name=>{
+   let val=values[name]||"";
+   if(val.trim()!==""){
+     let safe=name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+     text=text.replace(new RegExp("\\["+safe+"\\]","g"),val);
+   }
+ });
+
+ output.value=text;
+ output.style.height="auto";
+ output.style.height=output.scrollHeight+"px";
+}
+
+presetSelect.onchange=()=>{
+ values={};
+ render();
+};
+
+loadPresets();
+</script>
+
+</body>
+</html>
