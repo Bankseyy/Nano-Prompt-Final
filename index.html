@@ -13,10 +13,12 @@
  --muted:#9fb1a6;
  --border:#1c2b22;
  --accent:#2fe36b;
+ --danger:#ff5c5c;
  --radius:14px;
  --mono:ui-monospace, Menlo, Consolas, monospace;
  --sans:system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
 }
+
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}
 .wrap{max-width:1300px;margin:20px auto;padding:0 16px}
@@ -36,6 +38,14 @@ select,input,textarea,button{
 }
 
 button:hover{border-color:var(--accent)}
+
+.status-dot{
+ width:10px;height:10px;border-radius:50%;
+ display:inline-block;margin-left:6px;
+}
+
+.status-off{background:var(--danger)}
+.status-on{background:var(--accent)}
 
 .grid{display:grid;grid-template-columns:360px 1fr;gap:14px;margin-top:14px}
 
@@ -72,10 +82,14 @@ textarea{
 <div class="topbar">
  <div class="left">
   <strong>Nano Banana Prompt Builder</strong>
-  <span class="notice">Hosted Viewer</span>
   <select id="presetSelect"></select>
  </div>
+
  <div class="right">
+  <button id="toggleRefBtn">
+    Add Reference Instructions
+    <span id="statusDot" class="status-dot status-off"></span>
+  </button>
   <button id="copyBtn">Copy</button>
   <button id="downloadRefBtn">Download Reference</button>
  </div>
@@ -111,15 +125,47 @@ textarea{
 <script>
 let data=null;
 let values={};
+let includeReferenceInstructions=false;
+
+const REFERENCE_INSTRUCTIONS = `
+REFERENCE IMAGE USAGE INSTRUCTIONS:
+
+Use the reference image strictly as a composition and framing guide only.
+
+Allowed from reference:
+- Camera angle and height
+- Framing and crop
+- Subject positioning
+- Body posture
+- Spacing between subjects
+- Depth layering
+- Lighting direction
+- Overall composition symmetry
+
+Do NOT copy or inherit:
+- Faces
+- Identity
+- Facial structure
+- Hair
+- Age
+- Ethnicity
+- Skin tone
+- Expressions
+- Clothing details
+- Recognisable likeness of any individual
+
+Treat all people in the reference as mannequins used only to define pose and spatial layout.
+
+Generate entirely new individuals with zero facial similarity to the reference.
+`;
 
 async function loadPresets(){
  try{
    const res = await fetch("presets.json",{cache:"no-store"});
-   if(!res.ok) throw new Error("presets.json not found");
    data = await res.json();
    init();
  }catch(e){
-   alert("Could not load presets.json. Make sure it exists in the repo root.");
+   alert("Could not load presets.json.");
  }
 }
 
@@ -184,10 +230,20 @@ function renderOutput(){
    }
  });
 
+ if(includeReferenceInstructions){
+   text += "\n\n" + REFERENCE_INSTRUCTIONS;
+ }
+
  output.value=text;
  output.style.height="auto";
  output.style.height=output.scrollHeight+"px";
 }
+
+toggleRefBtn.onclick=()=>{
+ includeReferenceInstructions=!includeReferenceInstructions;
+ statusDot.className="status-dot "+(includeReferenceInstructions?"status-on":"status-off");
+ renderOutput();
+};
 
 copyBtn.onclick=()=>{
  navigator.clipboard.writeText(output.value);
