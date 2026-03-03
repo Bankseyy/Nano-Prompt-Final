@@ -1,0 +1,165 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Nano Prompt Builder (Repo Sync v2)</title>
+<style>
+body{background:#0b0f0c;color:#e7f2ea;font-family:system-ui;margin:0;padding:20px}
+.panel{display:grid;grid-template-columns:320px 1fr;gap:20px;margin-top:20px}
+select,input,textarea,button{background:#111a14;color:#e7f2ea;border:1px solid #1c2b22;padding:6px;border-radius:8px}
+textarea{width:100%;min-height:320px;font-family:monospace}
+.vars div{margin-bottom:8px}
+.header{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+</style>
+</head>
+<body>
+
+<h2>Nano Banana Prompt Builder — Repo Sync v2</h2>
+
+<div class="header">
+<select id="presetSelect"></select>
+<button onclick="addPreset()">Add</button>
+<button onclick="editPreset()">Edit</button>
+<button onclick="duplicatePreset()">Duplicate</button>
+<button onclick="deletePreset()">Delete</button>
+<button onclick="downloadJSON()">Download presets.json</button>
+<button onclick="jsonInput.click()">Load presets.json</button>
+<input type="file" id="jsonInput" accept="application/json" style="display:none">
+</div>
+
+<div class="panel">
+<div>
+<h3>Variables</h3>
+<div id="vars"></div>
+</div>
+
+<div>
+<h3>Output</h3>
+<textarea id="output"></textarea>
+<div style="margin-top:10px">
+<label>Reference image path:</label>
+<input id="refPath" placeholder="images/kitswap.png">
+</div>
+</div>
+</div>
+
+<script>
+let data={version:1,presets:[]};
+let values={};
+
+function currentPreset(){return data.presets.find(p=>p.id===presetSelect.value);}
+
+function detectVars(t){
+ const r=/\[([^\]]+)\]/g;let m,v=[];
+ while((m=r.exec(t))) if(!v.includes(m[1])) v.push(m[1]);
+ return v;
+}
+
+function render(){
+ presetSelect.innerHTML="";
+ data.presets.forEach(p=>{
+  let o=document.createElement("option");
+  o.value=p.id;
+  o.textContent=p.name;
+  presetSelect.appendChild(o);
+ });
+ if(data.presets.length) presetSelect.value=data.presets[0].id;
+ renderPreset();
+}
+
+function renderPreset(){
+ let p=currentPreset();
+ if(!p) return;
+ vars.innerHTML="";
+ detectVars(p.template).forEach(name=>{
+  let div=document.createElement("div");
+  let input=document.createElement("input");
+  input.value=values[name]||"";
+  input.oninput=()=>{values[name]=input.value;renderOutput();};
+  div.innerHTML="<b>"+name+"</b><br>";
+  div.appendChild(input);
+  vars.appendChild(div);
+ });
+ refPath.value=p.reference||"";
+ renderOutput();
+}
+
+function renderOutput(){
+ let p=currentPreset();
+ if(!p) return;
+ let text=p.template;
+ detectVars(p.template).forEach(name=>{
+  let val=values[name]||"";
+  if(val.trim()!==""){
+    let safe=name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+    text=text.replace(new RegExp("\\["+safe+"\\]","g"),val);
+  }
+ });
+ output.value=text;
+}
+
+function addPreset(){
+ let name=prompt("Preset name:");
+ if(!name) return;
+ let template=prompt("Paste template:");
+ if(!template) return;
+ data.presets.push({id:Date.now().toString(),name,template,reference:null});
+ render();
+}
+
+function editPreset(){
+ let p=currentPreset();
+ if(!p) return;
+ let template=prompt("Edit template:",p.template);
+ if(template) p.template=template;
+ renderPreset();
+}
+
+function duplicatePreset(){
+ let p=currentPreset();
+ if(!p) return;
+ data.presets.push({id:Date.now().toString(),name:p.name+" Copy",template:p.template,reference:p.reference});
+ render();
+}
+
+function deletePreset(){
+ if(data.presets.length<=1){alert("At least one preset required.");return;}
+ data.presets=data.presets.filter(p=>p.id!==presetSelect.value);
+ render();
+}
+
+function downloadJSON(){
+ let exportData={
+  version:1,
+  presets:data.presets.map(p=>({
+    id:p.id,
+    name:p.name,
+    template:p.template,
+    reference:refPath.value||null
+  }))
+ };
+ let blob=new Blob([JSON.stringify(exportData,null,2)],{type:"application/json"});
+ let a=document.createElement("a");
+ a.href=URL.createObjectURL(blob);
+ a.download="presets.json";
+ a.click();
+}
+
+jsonInput.onchange=e=>{
+ let file=e.target.files[0];
+ if(!file) return;
+ let reader=new FileReader();
+ reader.onload=evt=>{
+  data=JSON.parse(evt.target.result);
+  render();
+ };
+ reader.readAsText(file);
+};
+
+presetSelect.onchange=renderPreset;
+
+render();
+</script>
+
+</body>
+</html>
