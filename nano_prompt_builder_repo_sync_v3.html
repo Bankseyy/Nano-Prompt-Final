@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Nano Banana Prompt Builder (Repo Sync v3)</title>
+<style>
+:root{
+ --bg:#0b0f0c;
+ --panel:#0f1712;
+ --text:#e7f2ea;
+ --muted:#9fb1a6;
+ --border:#1c2b22;
+ --accent:#2fe36b;
+ --danger:#ff8f8f;
+ --radius:14px;
+ --mono:ui-monospace, Menlo, Consolas, monospace;
+ --sans:system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}
+.wrap{max-width:1300px;margin:20px auto;padding:0 16px}
+.topbar{
+ display:flex;justify-content:space-between;align-items:center;gap:12px;
+ padding:14px;border:1px solid var(--border);
+ border-radius:var(--radius);background:var(--panel);flex-wrap:wrap
+}
+.left,.right{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+select,input,textarea,button{font:inherit;color:inherit}
+select,input,textarea{
+ background:#111a14;border:1px solid var(--border);
+ border-radius:10px;padding:8px 10px;
+}
+button{
+ border:1px solid var(--border);
+ background:#111a14;padding:8px 12px;
+ border-radius:10px;cursor:pointer
+}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.btn-accent{border-color:var(--accent);color:var(--accent)}
+.btn-danger{border-color:#8b2f2f;color:var(--danger)}
+.btn-danger:hover{border-color:var(--danger)}
+.pill{
+ font-size:12px;padding:6px 10px;
+ border:1px solid var(--border);border-radius:999px;
+ color:var(--muted)
+}
+.notice{color:var(--muted);font-size:12px;line-height:1.4;margin-top:10px}
+.grid{display:grid;grid-template-columns:360px 1fr;gap:14px;margin-top:14px}
+.panel{border:1px solid var(--border);border-radius:var(--radius);background:var(--panel)}
+.panel-header{
+ padding:12px;border-bottom:1px solid var(--border);
+ display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px
+}
+.panel-body{padding:12px}
+.vars{display:flex;flex-direction:column;gap:10px;max-height:62vh;overflow:auto}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;color:var(--muted)}
+textarea.output{
+ width:100%;min-height:340px;resize:none;
+ font-family:var(--mono);white-space:pre-wrap
+}
+.thumbnail{
+ margin-top:12px;border:1px solid var(--border);
+ border-radius:10px;padding:8px;display:none;background:#111a14
+}
+.thumbnail img{max-width:100%;border-radius:8px;display:block}
+.modal-bg{
+ position:fixed;inset:0;background:rgba(0,0,0,.62);
+ display:none;align-items:center;justify-content:center;padding:16px
+}
+.modal{
+ width:900px;max-width:100%;background:var(--panel);
+ border:1px solid var(--border);border-radius:var(--radius);
+ box-shadow:0 18px 60px rgba(0,0,0,.55)
+}
+.modal header,.modal footer{
+ padding:12px;border-bottom:1px solid var(--border);
+ display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap
+}
+.modal footer{border-top:1px solid var(--border);border-bottom:none;justify-content:flex-end}
+.modal .content{padding:12px;display:flex;flex-direction:column;gap:10px}
+.modal textarea{min-height:280px}
+small.hint{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="left">
+      <strong>Nano Banana Prompt Builder</strong>
+      <span class="pill">Repo Sync v3</span>
+      <select id="presetSelect"></select>
+      <select id="sortMode" title="Variable list order">
+        <option value="appearance">Order in Prompt</option>
+        <option value="alpha">Alphabetical</option>
+      </select>
+      <button id="addPresetBtn" class="btn-accent">+ Add</button>
+      <button id="editPresetBtn">Edit</button>
+      <button id="duplicatePresetBtn">Duplicate</button>
+      <button id="deletePresetBtn" class="btn-danger">Delete</button>
+    </div>
+    <div class="right">
+      <button id="loadBtn">Load presets.json</button>
+      <button id="saveBtn" class="btn-accent">Download presets.json</button>
+      <input type="file" id="jsonInput" accept="application/json" style="display:none">
+      <span class="pill" id="statusPill">Not saved</span>
+      <span class="pill" id="charCount">0 chars</span>
+    </div>
+  </div>
+
+  <div class="notice">
+    This editor stores nothing in your browser. Click <b>Download presets.json</b> to commit changes to GitHub.
+    Reference images are <b>file paths</b> (e.g. <code>images/kitswap.png</code>) — no base64.
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-header">
+        <strong>Variables</strong>
+        <button id="resetVarsBtn">Clear values</button>
+      </div>
+      <div class="panel-body"><div class="vars" id="varsList"></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <strong>Live Output</strong>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button id="selectAllBtn">Select all</button>
+          <button id="copyBtn" class="btn-accent">Copy</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="field" style="margin-bottom:10px">
+          <label>Reference image path (repo-relative)</label>
+          <input id="refPathInput" placeholder="images/kitswap.png">
+        </div>
+        <textarea id="output" class="output"></textarea>
+        <div id="thumb" class="thumbnail">
+          <strong style="font-size:12px;color:var(--muted)">Reference Preview</strong>
+          <img id="thumbImg" alt="Reference preview">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modalBg" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true">
+    <header>
+      <strong id="modalTitle">Preset</strong>
+      <small class="hint">Variables are detected from anything in <b>[BRACKETS]</b>. Blank variables stay visible.</small>
+    </header>
+    <div class="content">
+      <input id="presetNameInput" placeholder="Preset name">
+      <input id="presetRefInput" placeholder="Reference path e.g. images/kitswap.png (optional)">
+      <textarea id="presetTemplateInput" placeholder="Paste full prompt here..."></textarea>
+      <small class="hint">Tip: keep placeholders like <code>[KIT]</code>, <code>[PERSON 1]</code>. References should point to files stored in your repo’s <b>/images</b> folder.</small>
+    </div>
+    <footer>
+      <button id="cancelModalBtn">Cancel</button>
+      <button id="savePresetBtn" class="btn-accent">Save</button>
+    </footer>
+  </div>
+</div>
+
+<script>
+function nowId(){
+  return "p_" + Math.random().toString(36).slice(2,10) + "_" + Date.now().toString(36);
+}
+
+const DEFAULT_DATA = {
+  version: 1,
+  updatedAt: null,
+  presets: [
+    {
+      id: "kitswap-graphic",
+      name: "KITSWAP GRAPHIC",
+      template: `PROMPT
+
+Photorealistic football kitswap portrait, professional club media photoshoot style.
+
+A male professional footballer with the same facial structure, skin tone, hairstyle, and body proportions as the reference player image, standing upright, facing camera, neutral confident expression.
+
+The player is wearing the [KIT] shirt, accurately recreated from reference: [KIT COLOUR], correct modern athletic fit. [BADGE] crest on left chest, [KIT MAKER] logo on right chest, [SPONSOR] sponsor centered, all logos flat, realistic, properly scaled, and naturally integrated into the fabric (not pasted).
+
+Realistic fabric folds, tension around shoulders and chest, natural lighting reflections on the shirt material. Skin texture visible, slight sweat sheen, realistic shadows under chin and arms.
+
+Plain studio or soft gradient background, no text, no graphic elements, no poster layout.
+
+Looks like an official transfer or squad photoshoot, shot on a DSLR, 85mm lens look, shallow depth of field. Ultra-realistic, high resolution, sharp focus, true-to-life proportions.`,
+      reference: null
+    }
+  ]
+};
+
+let data = structuredClone(DEFAULT_DATA);
+let ui = { sortMode: "appearance" };
+let state = { currentId: data.presets[0].id, modalMode: "add" };
+let values = {};
+let dirty = false;
+
+function setDirty(v=true){
+  dirty = v;
+  statusPill.textContent = dirty ? "Not saved" : "Saved";
+  statusPill.style.borderColor = dirty ? "#8b2f2f" : "var(--border)";
+  statusPill.style.color = dirty ? "var(--danger)" : "var(--muted)";
+}
+
+function currentPreset(){
+  return data.presets.find(p=>p.id===state.currentId) || data.presets[0];
+}
+
+function detectVars(template){
+  const regex=/\[([^\]]+)\]/g;
+  let match, vars=[];
+  while((match=regex.exec(template))!==null){
+    const v = match[1].trim();
+    if(!vars.includes(v)) vars.push(v);
+  }
+  return vars;
+}
+
+function sortedVars(vars){
+  if (ui.sortMode==="alpha") return vars.slice().sort((a,b)=>a.localeCompare(b));
+  return vars;
+}
+
+function renderPresetDropdown(){
+  presetSelect.innerHTML="";
+  data.presets.forEach(p=>{
+    const o=document.createElement("option");
+    o.value=p.id;
+    o.textContent=p.name;
+    presetSelect.appendChild(o);
+  });
+  presetSelect.value = state.currentId;
+}
+
+function renderVars(){
+  const p=currentPreset();
+  const vars = sortedVars(detectVars(p.template));
+  varsList.innerHTML="";
+  vars.forEach(name=>{
+    const f=document.createElement("div");f.className="field";
+    const l=document.createElement("label");l.textContent=name;
+    const i=document.createElement("input");
+    const key = p.id + "___" + name;
+    i.value = values[key] || "";
+    i.oninput=()=>{
+      values[key]=i.value;
+      setDirty(true);
+      renderOutput();
+    };
+    f.appendChild(l);f.appendChild(i);
+    varsList.appendChild(f);
+  });
+}
+
+function renderOutput(){
+  const p=currentPreset();
+  const vars = sortedVars(detectVars(p.template));
+  let text = p.template;
+  vars.forEach(name=>{
+    const key = p.id + "___" + name;
+    const val = values[key] || "";
+    if (val.trim() !== ""){
+      const safe=name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+      text = text.replace(new RegExp("\\["+safe+"\\]","g"), val);
+    }
+  });
+  output.value=text;
+  charCount.textContent = text.length + " chars";
+  output.style.height="auto";
+  output.style.height=output.scrollHeight+"px";
+}
+
+function renderReferenceUI(){
+  const p=currentPreset();
+  refPathInput.value = p.reference || "";
+  if (p.reference){
+    thumb.style.display="block";
+    thumbImg.onerror = () => { thumb.style.display="none"; };
+    thumbImg.src = p.reference;
+  } else {
+    thumb.style.display="none";
+    thumbImg.removeAttribute("src");
+  }
+}
+
+function rerenderAll(){
+  renderPresetDropdown();
+  renderVars();
+  renderOutput();
+  renderReferenceUI();
+}
+
+presetSelect.onchange=()=>{
+  state.currentId = presetSelect.value;
+  rerenderAll();
+};
+
+sortMode.onchange=()=>{
+  ui.sortMode = sortMode.value;
+  renderVars();
+};
+
+selectAllBtn.onclick=()=>output.select();
+copyBtn.onclick=()=>{output.select();document.execCommand("copy");};
+
+resetVarsBtn.onclick=()=>{
+  const p=currentPreset();
+  detectVars(p.template).forEach(name=>delete values[p.id + "___" + name]);
+  setDirty(true);
+  renderVars();
+  renderOutput();
+};
+
+refPathInput.oninput=()=>{
+  const p=currentPreset();
+  p.reference = (refPathInput.value.trim() || null);
+  setDirty(true);
+  renderReferenceUI();
+};
+
+function openModal(mode){
+  state.modalMode = mode;
+  const p=currentPreset();
+  modalTitle.textContent = mode==="add" ? "Add Preset" : "Edit Preset";
+  presetNameInput.value = mode==="add" ? "" : p.name;
+  presetTemplateInput.value = mode==="add" ? "" : p.template;
+  presetRefInput.value = mode==="add" ? "" : (p.reference || "");
+  modalBg.style.display="flex";
+  modalBg.setAttribute("aria-hidden","false");
+  presetNameInput.focus();
+}
+function closeModal(){
+  modalBg.style.display="none";
+  modalBg.setAttribute("aria-hidden","true");
+}
+
+addPresetBtn.onclick=()=>openModal("add");
+editPresetBtn.onclick=()=>openModal("edit");
+
+duplicatePresetBtn.onclick=()=>{
+  const p=currentPreset();
+  const copy = { id: nowId(), name: p.name + " Copy", template: p.template, reference: p.reference || null };
+  data.presets.push(copy);
+  state.currentId = copy.id;
+  setDirty(true);
+  rerenderAll();
+};
+
+deletePresetBtn.onclick=()=>{
+  if (data.presets.length<=1){ alert("At least one preset is required."); return; }
+  const p=currentPreset();
+  if(!confirm("Delete preset '" + p.name + "'?")) return;
+  Object.keys(values).forEach(k=>{ if(k.startsWith(p.id + "___")) delete values[k]; });
+  data.presets = data.presets.filter(x=>x.id!==p.id);
+  state.currentId = data.presets[0].id;
+  setDirty(true);
+  rerenderAll();
+};
+
+cancelModalBtn.onclick=closeModal;
+modalBg.onclick=(e)=>{ if(e.target===modalBg) closeModal(); };
+
+savePresetBtn.onclick=()=>{
+  const name = presetNameInput.value.trim();
+  const template = presetTemplateInput.value || "";
+  const ref = presetRefInput.value.trim() || null;
+  if(!name || !template.trim()) return;
+
+  if (state.modalMode==="add"){
+    const p = { id: nowId(), name, template, reference: ref };
+    data.presets.push(p);
+    state.currentId = p.id;
+  } else {
+    const p=currentPreset();
+    p.name = name;
+    p.template = template;
+    p.reference = ref;
+  }
+  setDirty(true);
+  closeModal();
+  rerenderAll();
+};
+
+function download(filename, text){
+  const blob = new Blob([text], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+function buildExportObject(){
+  return {
+    version: data.version,
+    updatedAt: new Date().toISOString(),
+    presets: data.presets.map(p=>({
+      id: p.id,
+      name: p.name,
+      template: p.template,
+      reference: p.reference || null
+    }))
+  };
+}
+
+saveBtn.onclick=()=>{
+  download("presets.json", JSON.stringify(buildExportObject(), null, 2));
+  setDirty(false);
+};
+
+loadBtn.onclick=()=>jsonInput.click();
+jsonInput.onchange=(e)=>{
+  const file=e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload=(evt)=>{
+    try{
+      const obj = JSON.parse(evt.target.result);
+      if(!obj || !Array.isArray(obj.presets)) throw new Error("Invalid presets.json");
+      data = {
+        version: obj.version || 1,
+        updatedAt: obj.updatedAt || null,
+        presets: obj.presets.map(p=>({
+          id: p.id || nowId(),
+          name: String(p.name||"Untitled"),
+          template: String(p.template||""),
+          reference: (p.reference ? String(p.reference) : null)
+        }))
+      };
+      values = {};
+      ui.sortMode = "appearance";
+      sortMode.value = ui.sortMode;
+      state.currentId = data.presets[0]?.id || null;
+      setDirty(false);
+      rerenderAll();
+    }catch(err){
+      alert("Could not load file: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+};
+
+sortMode.value = ui.sortMode;
+setDirty(false);
+rerenderAll();
+
+window.addEventListener("beforeunload", (e)=>{
+  if(!dirty) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+</script>
+</body>
+</html>
