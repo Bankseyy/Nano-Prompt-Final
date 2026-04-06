@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-03-27T12:09:39.285Z",
+  "updatedAt": "2026-04-06T14:39:10.050Z",
   "presets": [
     {
       "id": "kitswap-graphic",
@@ -49,6 +49,12 @@
       "name": "PUB SIGN",
       "template": "Create a photorealistic traditional UK pub sign mounted outside a real British pub. The pub sign is the main focus of the image, centered and prominent, with a visible pub or pub garden softly in the background for context. Use a classic hanging pub sign style: ornate black metal bracket, framed rectangular signboard, painted wooden finish, authentic heritage pub aesthetic, warm natural outdoor lighting.\n\nInside the sign, feature [IMAGE] rendered as a traditional hand-painted pub sign illustration, adapted into a vintage British pub-sign style. The artwork should feel iconic, decorative, and slightly stylised, as if painted by a skilled pub sign artist. It must sit cleanly within the sign panel and look fully integrated into the sign design.\n\nImportant: leave a clear horizontal gap/panel underneath the main image area for custom text to be added later. This lower area should be blank, clean, and intentionally reserved for typography, with enough space for a pub name or slogan. Do not place any text in the image.\n\nComposition: portrait [ASPECT RATIO] aspect ratio. The hanging sign should dominate the frame, while the building exterior and a subtle pub garden or outdoor pub setting remain visible in the background. Background should be realistic but secondary, with shallow depth of field so attention stays on the sign.\n\nStyle keywords: traditional British pub signage, authentic UK pub exterior, heritage sign painting, decorative wrought iron bracket, painted wooden sign, realistic countryside or village pub atmosphere, polished but natural.",
       "reference": "images/pubsign.png"
+    },
+    {
+      "id": "p_kbv9e4kg_mnnaq78i",
+      "name": "SUPER SUB",
+      "template": "Recreate this exact composition: four male football players [PLAYER A], [PLAYER B], [PLAYER C], [PLAYER D] seated side by side on a substitutes bench inside a stadium dugout. The players' faces and upper chests fill the entire width of the frame. Their heads sit in the upper half of the image with minimal headroom — the top of the frame clips just above their heads. Below them, their chests and the tops of their training jackets fill the lower portion of the frame naturally. The dugout curved perspex canopy is just barely visible at the very top edge. Packed blurred stadium crowd visible in the background through the dugout opening. Burgundy padded leather seats behind them. Plain dark charcoal zip-up training jackets, subtle red trim, no logos or badges. Serious watchful expressions all looking slightly off to the left. Dark moody floodlit evening atmosphere. Photorealistic, cinematic sports photography. 4:5 aspect ratio.\nNegative prompt:\nlogos, badges, sponsor text, excessive headroom, wide shot, bright lighting, cartoon",
+      "reference": "supersub"
     }
   ]
 }
