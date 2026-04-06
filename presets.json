@@ -54,7 +54,7 @@
       "id": "p_kbv9e4kg_mnnaq78i",
       "name": "SUPER SUB",
       "template": "Recreate this exact composition: four male football players [PLAYER A], [PLAYER B], [PLAYER C], [PLAYER D] seated side by side on a substitutes bench inside a stadium dugout. The players' faces and upper chests fill the entire width of the frame. Their heads sit in the upper half of the image with minimal headroom — the top of the frame clips just above their heads. Below them, their chests and the tops of their training jackets fill the lower portion of the frame naturally. The dugout curved perspex canopy is just barely visible at the very top edge. Packed blurred stadium crowd visible in the background through the dugout opening. Burgundy padded leather seats behind them. Plain dark charcoal zip-up training jackets, subtle red trim, no logos or badges. Serious watchful expressions all looking slightly off to the left. Dark moody floodlit evening atmosphere. Photorealistic, cinematic sports photography. 4:5 aspect ratio.\nNegative prompt:\nlogos, badges, sponsor text, excessive headroom, wide shot, bright lighting, cartoon",
-      "reference": "supersub"
+      "reference": "images/supersub.png"
     }
   ]
 }
