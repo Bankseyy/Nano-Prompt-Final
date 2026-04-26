@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-06T14:39:10.050Z",
+  "updatedAt": "2026-04-26T16:16:21.866Z",
   "presets": [
     {
       "id": "kitswap-graphic",
@@ -55,6 +55,12 @@
       "name": "SUPER SUB",
       "template": "Recreate this exact composition: four male football players [PLAYER A], [PLAYER B], [PLAYER C], [PLAYER D] seated side by side on a substitutes bench inside a stadium dugout. The players' faces and upper chests fill the entire width of the frame. Their heads sit in the upper half of the image with minimal headroom — the top of the frame clips just above their heads. Below them, their chests and the tops of their training jackets fill the lower portion of the frame naturally. The dugout curved perspex canopy is just barely visible at the very top edge. Packed blurred stadium crowd visible in the background through the dugout opening. Burgundy padded leather seats behind them. Plain dark charcoal zip-up training jackets, subtle red trim, no logos or badges. Serious watchful expressions all looking slightly off to the left. Dark moody floodlit evening atmosphere. Photorealistic, cinematic sports photography. 4:5 aspect ratio.\nNegative prompt:\nlogos, badges, sponsor text, excessive headroom, wide shot, bright lighting, cartoon",
       "reference": "images/supersub.png"
+    },
+    {
+      "id": "p_f3t3ecno_mofz0az0",
+      "name": "NO.2 AND NO.3",
+      "template": "Hyperrealistic Getty Images editorial sports photograph, 4:5 portrait orientation. \nThe camera is positioned at low eye-level with the seated player, angled slightly \nupward. Frame tightly so the seated player fills from roughly mid-frame to the \nbottom edge — his knees near the lower frame edge — and the standing players' \nheads sit close to the top edge. No empty rows of seats visible below the seated \nplayer. Minimal dead space above the standing players' heads. The group of nine \nplayers fills the entire frame edge to edge.\n\nShot inside a large football stadium with tiered seating. The stand is almost entirely \nempty — only a suggestion of vacant seats visible behind and to the sides of the players.\n\nIn the front row, [SITTING] sits alone in the centre of the row, relaxed but composed, \nlooking directly into the camera. The seats either side of him are completely empty, \ngiving a clear unobstructed view of the full row.\n\nIn the row directly behind him, eight elite professional footballers stand shoulder \nto shoulder in a straight line, all facing the camera, hands clasped firmly behind \ntheir backs, stern and intense expressions. From left to right: [STANDING 1], \n[STANDING 2], [STANDING 3], [STANDING 4], [STANDING 5], [STANDING 6], [STANDING 7], \n[STANDING 8]. All eight players are wearing the exact kit shown in the reference \nimage — [KIT] — replicate the shirt, shorts, socks and any badge or sponsor detail \nprecisely.\n\nEvery player's face is in crisp, razor-sharp focus. The lighting is natural stadium \ndaylight with slight overcast fill — no harsh shadows. Photojournalistic depth, \nultra-detailed skin texture, true-to-life proportions. No compositing artefacts. \nGetty Images quality, editorial football photography.",
+      "reference": null
     }
   ]
 }
