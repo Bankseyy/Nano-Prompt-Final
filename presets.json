@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-26T16:16:21.866Z",
+  "updatedAt": "2026-05-06T16:37:41.810Z",
   "presets": [
     {
       "id": "kitswap-graphic",
@@ -60,6 +60,12 @@
       "id": "p_f3t3ecno_mofz0az0",
       "name": "NO.2 AND NO.3",
       "template": "Hyperrealistic Getty Images editorial sports photograph, 4:5 portrait orientation. \nThe camera is positioned at low eye-level with the seated player, angled slightly \nupward. Frame tightly so the seated player fills from roughly mid-frame to the \nbottom edge — his knees near the lower frame edge — and the standing players' \nheads sit close to the top edge. No empty rows of seats visible below the seated \nplayer. Minimal dead space above the standing players' heads. The group of nine \nplayers fills the entire frame edge to edge.\n\nShot inside a large football stadium with tiered seating. The stand is almost entirely \nempty — only a suggestion of vacant seats visible behind and to the sides of the players.\n\nIn the front row, [SITTING] sits alone in the centre of the row, relaxed but composed, \nlooking directly into the camera. The seats either side of him are completely empty, \ngiving a clear unobstructed view of the full row.\n\nIn the row directly behind him, eight elite professional footballers stand shoulder \nto shoulder in a straight line, all facing the camera, hands clasped firmly behind \ntheir backs, stern and intense expressions. From left to right: [STANDING 1], \n[STANDING 2], [STANDING 3], [STANDING 4], [STANDING 5], [STANDING 6], [STANDING 7], \n[STANDING 8]. All eight players are wearing the exact kit shown in the reference \nimage — [KIT] — replicate the shirt, shorts, socks and any badge or sponsor detail \nprecisely.\n\nEvery player's face is in crisp, razor-sharp focus. The lighting is natural stadium \ndaylight with slight overcast fill — no harsh shadows. Photojournalistic depth, \nultra-detailed skin texture, true-to-life proportions. No compositing artefacts. \nGetty Images quality, editorial football photography.",
+      "reference": null
+    },
+    {
+      "id": "p_wlmcnomo_moua69jp",
+      "name": "KITSWAP NEW",
+      "template": "TITLE: Football Kit Swap – Professional Club Media Photoshoot Portrait\n\nREFERENCE 1 — PLAYER:\nUse this image for face, likeness, and body only.\nFace accuracy is the single highest priority.\nDo not carry over kit, clothing, background, or environment.\n\nREFERENCE 2 — KIT:\nThis image is the only source of truth for the kit.\nReproduce it exactly as it appears — every colour, logo, pattern,\nand design detail must match the reference precisely.\nDo not interpret, invent, or add any detail not visible in this image.\nIf a detail is not in the reference, it does not exist on the shirt.\n\nSUBJECT:\nMale professional footballer. Standing upright facing camera.\nNeutral confident expression. Arms relaxed at sides.\n\nFRAMING:\nPortrait cropped at mid-thigh. Full shirt visible collar to hem.\nHead in upper quarter of frame. Both forearms visible.\n\nQUALITY:\nNatural skin texture. No airbrushing. Sharp focus head to mid-thigh.\nNo bokeh on kit. DSLR 85mm aesthetic. Eye-level camera. Zero tilt.\n\nBACKGROUND:\nPure white seamless studio only. No exceptions.\nNo grass, pitch, outdoor environment, or green tones anywhere.\n\nNEGATIVE PROMPTS:\nGeneric face. Idealised face. Wrong likeness. Face substitution.\nInvented kit details. Fabricated panels or seam lines.\nDetails not present in kit reference. Wrong colours. Wrong logos.\nAirbrushed skin. Squad numbers. Feet or boots visible.\nOutdoor background. Grass. Green tones. Coloured background.\nCamera tilt. Low or high angle. Cartoon. CGI. Illustrated.",
       "reference": null
     }
   ]
