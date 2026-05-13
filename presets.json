@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-06T16:37:41.810Z",
+  "updatedAt": "2026-05-13T14:32:30.880Z",
   "presets": [
     {
       "id": "kitswap-graphic",
@@ -65,7 +65,7 @@
     {
       "id": "p_wlmcnomo_moua69jp",
       "name": "KITSWAP NEW",
-      "template": "TITLE: Football Kit Swap – Professional Club Media Photoshoot Portrait\n\nREFERENCE 1 — PLAYER:\nUse this image for face, likeness, and body only.\nFace accuracy is the single highest priority.\nDo not carry over kit, clothing, background, or environment.\n\nREFERENCE 2 — KIT:\nThis image is the only source of truth for the kit.\nReproduce it exactly as it appears — every colour, logo, pattern,\nand design detail must match the reference precisely.\nDo not interpret, invent, or add any detail not visible in this image.\nIf a detail is not in the reference, it does not exist on the shirt.\n\nSUBJECT:\nMale professional footballer. Standing upright facing camera.\nNeutral confident expression. Arms relaxed at sides.\n\nFRAMING:\nPortrait cropped at mid-thigh. Full shirt visible collar to hem.\nHead in upper quarter of frame. Both forearms visible.\n\nQUALITY:\nNatural skin texture. No airbrushing. Sharp focus head to mid-thigh.\nNo bokeh on kit. DSLR 85mm aesthetic. Eye-level camera. Zero tilt.\n\nBACKGROUND:\nPure white seamless studio only. No exceptions.\nNo grass, pitch, outdoor environment, or green tones anywhere.\n\nNEGATIVE PROMPTS:\nGeneric face. Idealised face. Wrong likeness. Face substitution.\nInvented kit details. Fabricated panels or seam lines.\nDetails not present in kit reference. Wrong colours. Wrong logos.\nAirbrushed skin. Squad numbers. Feet or boots visible.\nOutdoor background. Grass. Green tones. Coloured background.\nCamera tilt. Low or high angle. Cartoon. CGI. Illustrated.",
+      "template": "CRITICAL — KIT (Read first, apply always):\nREFERENCE IMAGE 2 is the kit. Copy it. Do not recreate it. Do not interpret it. Do not complete details you cannot see. Every colour, every logo, every graphic, every stripe, every badge position must be taken directly from that image and only that image. If a detail is not visible in Reference 2, it is absent from the shirt. Add nothing. Change nothing.\nPLAYER:\nREFERENCE IMAGE 1 provides the face and body only. Exact facial likeness is the top priority. Do not carry over any clothing, kit, background, or environment from Reference 1.\nSUBJECT:\nMale professional footballer. Standing upright, facing camera directly. Neutral confident expression. Arms relaxed at sides.\nFRAMING:\nPortrait cropped at mid-thigh. Full shirt visible from collar to hem. Head sits in upper quarter of frame. Both forearms visible.\nBACKGROUND:\nPure white seamless studio. No exceptions. No grass, pitch, outdoor elements, or green tones anywhere in frame.\nTECHNICAL:\nDSLR 85mm portrait lens. Eye-level camera. Zero tilt. Sharp focus from head to mid-thigh — no bokeh on the kit. Natural skin texture, no airbrushing.\nDO NOT:\nInvent kit details. Add panels, seams, or graphics not in Reference 2. Change any kit colour. Substitute or generalise the face. Add squad numbers. Show feet or boots. Use any background other than white. Tilt the camera. Render as CGI, illustration, or cartoon.",
       "reference": null
     }
   ]
