@@ -3,129 +3,375 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Nano Banana Prompt Builder</title>
+<title>Nano Banana Prompt Studio</title>
 
 <style>
 :root{
- --bg:#0b0f0c;
- --panel:#0f1712;
- --text:#e7f2ea;
- --muted:#9fb1a6;
- --border:#1c2b22;
- --accent:#2fe36b;
- --danger:#ff5c5c;
- --radius:14px;
+ --bg:#0b0d0c;
+ --panel:#111512;
+ --panel-2:#151b17;
+ --text:#edf5ef;
+ --muted:#a4b2aa;
+ --border:#27322c;
+ --accent:#38df75;
+ --accent-soft:#153522;
+ --warn:#f0bf55;
+ --danger:#ff8585;
+ --danger-border:#783436;
+ --radius:12px;
  --mono:ui-monospace, Menlo, Consolas, monospace;
  --sans:system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
 }
 
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}
-.wrap{max-width:1300px;margin:20px auto;padding:0 16px}
-
-.topbar{
- display:flex;justify-content:space-between;align-items:center;gap:12px;
- padding:14px;border:1px solid var(--border);
- border-radius:var(--radius);background:var(--panel);flex-wrap:wrap
+html{color-scheme:dark}
+body{
+ margin:0;
+ background:var(--bg);
+ color:var(--text);
+ font-family:var(--sans);
 }
 
-.left,.right{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.wrap{max-width:1420px;margin:18px auto;padding:0 16px 28px}
+.topbar{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ gap:12px;
+ padding:12px;
+ border:1px solid var(--border);
+ border-radius:var(--radius);
+ background:var(--panel);
+ flex-wrap:wrap;
+}
+.left,.right,.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.brand{font-weight:750;letter-spacing:0}
+.prompt-nav{
+ width:100%;
+ display:grid;
+ gap:8px;
+ padding-top:10px;
+ border-top:1px solid var(--border);
+}
+.nav-row{
+ display:grid;
+ grid-template-columns:72px minmax(0,1fr);
+ gap:8px;
+ align-items:center;
+}
+.nav-label{font-size:12px;color:var(--muted)}
+.button-strip{
+ display:flex;
+ gap:8px;
+ overflow-x:auto;
+ padding-bottom:2px;
+ scrollbar-width:thin;
+}
+.parent-button,.prompt-button{
+ min-height:34px;
+ max-width:220px;
+ overflow:hidden;
+ text-overflow:ellipsis;
+}
+.parent-button.active,.prompt-button.active{
+ border-color:var(--accent);
+ color:var(--accent);
+ background:var(--accent-soft);
+}
+.prompt-button.has-reference::after{
+ content:"";
+ width:6px;
+ height:6px;
+ border-radius:50%;
+ display:inline-block;
+ margin-left:7px;
+ vertical-align:middle;
+ background:var(--accent);
+}
 
 select,input,textarea,button{
- font:inherit;color:inherit;
- background:#111a14;border:1px solid var(--border);
- border-radius:10px;padding:8px 10px;
+ font:inherit;
+ color:inherit;
 }
-
+select,input,textarea{
+ background:#0d120f;
+ border:1px solid var(--border);
+ border-radius:8px;
+ padding:8px 10px;
+ min-height:38px;
+}
+select{max-width:360px}
+input,textarea{width:100%}
+textarea{
+ font-family:var(--mono);
+ line-height:1.45;
+ resize:vertical;
+}
+button{
+ border:1px solid var(--border);
+ background:#0d120f;
+ padding:8px 11px;
+ border-radius:8px;
+ min-height:38px;
+ cursor:pointer;
+ white-space:nowrap;
+}
 button:hover{border-color:var(--accent)}
+button:disabled{opacity:.46;cursor:not-allowed}
+.btn-accent{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.btn-danger{border-color:var(--danger-border);color:var(--danger)}
+.btn-danger:hover{border-color:var(--danger)}
 
-.status-dot{
- width:10px;height:10px;border-radius:50%;
- display:inline-block;margin-left:6px;
+.segmented{
+ display:flex;
+ border:1px solid var(--border);
+ border-radius:8px;
+ overflow:hidden;
+ background:#0d120f;
+}
+.segmented button{
+ border:0;
+ border-radius:0;
+ background:transparent;
+ min-height:36px;
+}
+.segmented button.active{
+ background:var(--accent-soft);
+ color:var(--accent);
 }
 
-.status-off{background:var(--danger)}
-.status-on{background:var(--accent)}
+.pill{
+ font-size:12px;
+ padding:6px 9px;
+ border:1px solid var(--border);
+ border-radius:999px;
+ color:var(--muted);
+ min-height:30px;
+ display:inline-flex;
+ align-items:center;
+}
+.pill.warn{border-color:#6e5520;color:var(--warn)}
+.pill.good{border-color:#2b6a42;color:var(--accent)}
 
-.grid{display:grid;grid-template-columns:360px 1fr;gap:14px;margin-top:14px}
-
-.panel{border:1px solid var(--border);border-radius:var(--radius);background:var(--panel)}
+.grid{
+ display:grid;
+ grid-template-columns:minmax(280px,360px) minmax(0,1fr);
+ gap:14px;
+ margin-top:14px;
+ align-items:start;
+}
+.panel{
+ border:1px solid var(--border);
+ border-radius:var(--radius);
+ background:var(--panel);
+ overflow:hidden;
+}
 .panel-header{
- padding:12px;border-bottom:1px solid var(--border);
- display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap
+ padding:12px;
+ border-bottom:1px solid var(--border);
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ gap:10px;
+ flex-wrap:wrap;
 }
 .panel-body{padding:12px}
-
-.vars{display:flex;flex-direction:column;gap:10px;max-height:72vh;overflow:auto}
-
-.field{display:flex;flex-direction:column;gap:4px}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
+.field:last-child{margin-bottom:0}
 .field label{font-size:12px;color:var(--muted)}
-
-textarea{
- width:100%;min-height:340px;resize:none;
- font-family:var(--mono);white-space:pre-wrap
+.vars{display:flex;flex-direction:column;gap:10px;max-height:66vh;overflow:auto}
+.empty-state{
+ color:var(--muted);
+ border:1px dashed var(--border);
+ border-radius:8px;
+ padding:14px;
 }
 
+.output{
+ width:100%;
+ min-height:430px;
+ white-space:pre-wrap;
+}
 .thumbnail{
- margin-top:12px;border:1px solid var(--border);
- border-radius:10px;padding:8px;display:none;background:#111a14
+ margin-top:12px;
+ border:1px solid var(--border);
+ border-radius:8px;
+ padding:8px;
+ display:none;
+ background:#0d120f;
 }
-.thumbnail img{max-width:100%;border-radius:8px}
+.thumbnail strong{font-size:12px;color:var(--muted)}
+.thumbnail img{
+ max-width:100%;
+ max-height:360px;
+ border-radius:6px;
+ display:block;
+ margin-top:8px;
+ object-fit:contain;
+}
 
-.notice{color:var(--muted);font-size:12px}
+.editor-panel{display:none;margin-top:14px}
+body.editing .editor-panel{display:block}
+.editor-grid{
+ display:grid;
+ grid-template-columns:minmax(260px,340px) minmax(0,1fr);
+ gap:12px;
+}
+.template-editor{min-height:420px}
+.editor-actions{
+ display:flex;
+ gap:8px;
+ flex-wrap:wrap;
+ align-items:center;
+}
+
+.hidden-file{display:none}
+
+@media (max-width:900px){
+ .wrap{margin-top:10px;padding-inline:10px}
+ .grid,.editor-grid{grid-template-columns:1fr}
+ .vars{max-height:none}
+ select{max-width:100%;width:100%}
+ .left,.right{width:100%}
+ .right{justify-content:flex-start}
+ .nav-row{grid-template-columns:1fr}
+ .output{min-height:320px}
+}
 </style>
 </head>
 <body>
-
 <div class="wrap">
-
-<div class="topbar">
- <div class="left">
-  <strong>Nano Banana Prompt Builder</strong>
-  <select id="presetSelect"></select>
- </div>
-
- <div class="right">
-  <button id="toggleRefBtn">
-    Add Reference Instructions
-    <span id="statusDot" class="status-dot status-off"></span>
-  </button>
-  <button id="copyBtn">Copy</button>
-  <button id="downloadRefBtn">Download Reference</button>
- </div>
-</div>
-
-<div class="grid">
-
- <div class="panel">
-  <div class="panel-header">
-   <strong>Variables</strong>
+ <div class="topbar">
+  <div class="left">
+   <span class="brand">Nano Banana Prompt Studio</span>
+   <select id="sortMode" title="Variable order">
+    <option value="appearance">Order in Prompt</option>
+    <option value="alpha">Alphabetical</option>
+   </select>
   </div>
-  <div class="panel-body">
-   <div class="vars" id="vars"></div>
+  <div class="right">
+   <div class="segmented" aria-label="Mode">
+    <button id="buildModeBtn" class="active" type="button">Build</button>
+    <button id="editModeBtn" type="button">Edit</button>
+   </div>
+   <button id="toggleRefBtn" type="button">Reference Rules</button>
+   <button id="clearValuesBtn" type="button">Clear Values</button>
+   <button id="copyBtn" class="btn-accent" type="button">Copy</button>
+   <button id="downloadRefBtn" type="button">Reference Image</button>
+   <span class="pill" id="statusPill">Loading</span>
+   <span class="pill" id="charCount">0 chars</span>
   </div>
- </div>
-
- <div class="panel">
-  <div class="panel-header">
-   <strong>Live Output</strong>
-  </div>
-  <div class="panel-body">
-   <textarea id="output"></textarea>
-   <div id="thumb" class="thumbnail">
-    <strong style="font-size:12px;color:var(--muted)">Reference Preview</strong>
-    <img id="thumbImg">
+  <div class="prompt-nav" aria-label="Prompt library">
+   <div class="nav-row">
+    <span class="nav-label">Parents</span>
+    <div class="button-strip" id="parentStrip"></div>
+   </div>
+   <div class="nav-row">
+    <span class="nav-label">Prompts</span>
+    <div class="button-strip" id="promptStrip"></div>
    </div>
   </div>
  </div>
 
-</div>
+ <div class="grid">
+  <section class="panel">
+   <div class="panel-header">
+    <strong>Variables</strong>
+    <span class="pill" id="varCount">0</span>
+   </div>
+   <div class="panel-body">
+    <div class="vars" id="varsList"></div>
+   </div>
+  </section>
+
+  <section class="panel">
+   <div class="panel-header">
+    <strong>Live Output</strong>
+    <div class="toolbar">
+     <button id="selectAllBtn" type="button">Select All</button>
+     <button id="copyBtn2" class="btn-accent" type="button">Copy</button>
+    </div>
+   </div>
+   <div class="panel-body">
+    <textarea id="output" class="output" spellcheck="false"></textarea>
+    <div id="thumb" class="thumbnail">
+     <strong>Reference Preview</strong>
+     <img id="thumbImg" alt="Reference preview">
+    </div>
+   </div>
+  </section>
+ </div>
+
+ <section class="panel editor-panel" id="editorPanel">
+  <div class="panel-header">
+   <strong>Edit Library</strong>
+   <div class="editor-actions">
+    <button id="addPresetBtn" class="btn-accent" type="button">Add</button>
+    <button id="duplicatePresetBtn" type="button">Duplicate</button>
+    <button id="moveUpBtn" type="button">Move Up</button>
+    <button id="moveDownBtn" type="button">Move Down</button>
+    <button id="deletePresetBtn" class="btn-danger" type="button">Delete</button>
+    <button id="connectFolderBtn" type="button">Connect Folder</button>
+    <button id="addImageBtn" type="button">Add Image</button>
+    <button id="importBtn" type="button">Import JSON</button>
+    <button id="exportBtn" class="btn-accent" type="button">Save presets.json</button>
+    <button id="reloadRepoBtn" type="button">Reload Repo</button>
+    <input class="hidden-file" type="file" id="jsonInput" accept="application/json">
+    <input class="hidden-file" type="file" id="imageInput" accept="image/*">
+   </div>
+  </div>
+  <div class="panel-body">
+   <div class="editor-grid">
+    <div>
+     <div class="field">
+      <label for="editNameInput">Preset Name</label>
+      <input id="editNameInput" autocomplete="off">
+     </div>
+     <div class="field">
+      <label for="editParentInput">Parent</label>
+      <input id="editParentInput" list="parentOptions" placeholder="General" autocomplete="off">
+      <datalist id="parentOptions"></datalist>
+     </div>
+     <div class="field">
+      <label for="editRefInput">Reference Image Path</label>
+      <input id="editRefInput" placeholder="images/example.png" autocomplete="off">
+     </div>
+     <div class="field">
+      <label>Image Folder</label>
+      <div class="empty-state" id="folderStatus">Not connected</div>
+     </div>
+     <div class="field">
+      <label>Detected Variables</label>
+      <div class="empty-state" id="detectedVars">None</div>
+     </div>
+    </div>
+    <div class="field">
+     <label for="editTemplateInput">Prompt Template</label>
+     <textarea id="editTemplateInput" class="template-editor" spellcheck="false"></textarea>
+    </div>
+   </div>
+  </div>
+ </section>
 </div>
 
 <script>
-let data=null;
-let values={};
-let includeReferenceInstructions=false;
+const STORAGE_KEY = "nano_prompt_studio_data_v1";
+const VALUES_KEY = "nano_prompt_studio_values_v1";
+const DIRTY_KEY = "nano_prompt_studio_dirty_v1";
+
+const DEFAULT_DATA = {
+ version: 1,
+ updatedAt: null,
+ presets: [
+  {
+   id: "starter",
+   name: "Starter Prompt",
+   parent: "General",
+   template: "Describe [SUBJECT] in [STYLE] style.",
+   reference: null
+  }
+ ]
+};
 
 const REFERENCE_INSTRUCTIONS = `
 REFERENCE IMAGE USAGE INSTRUCTIONS:
@@ -159,112 +405,724 @@ Treat all people in the reference as mannequins used only to define pose and spa
 Generate entirely new individuals with zero facial similarity to the reference.
 `;
 
-async function loadPresets(){
+let data = structuredClone(DEFAULT_DATA);
+let values = {};
+let dirty = false;
+let editMode = false;
+let includeReferenceInstructions = false;
+let ui = { sortMode: "appearance" };
+let state = { currentId: null, activeParent: null, source: "Loading" };
+let projectDirHandle = null;
+let imagesDirHandle = null;
+let lastImageSave = "";
+
+function nowId(){
+ return "p_" + Math.random().toString(36).slice(2,10) + "_" + Date.now().toString(36);
+}
+
+function cleanParent(parent){
+ return String(parent || "").trim() || "General";
+}
+
+function inferParentName(name){
+ const upper = String(name || "").toUpperCase();
+ if (upper.includes("KITSWAP")) return "Kitswap";
+ if (upper.includes("MOUNT RUSHMORE")) return "Mount Rushmore";
+ return "General";
+}
+
+function parentOf(preset){
+ return cleanParent(preset && preset.parent);
+}
+
+function normalizeData(obj){
+ const presets = Array.isArray(obj && obj.presets) ? obj.presets : [];
+ return {
+  version: Number(obj && obj.version) || 1,
+  updatedAt: obj && obj.updatedAt ? String(obj.updatedAt) : null,
+  presets: presets.map(p=>({
+   id: p && p.id ? String(p.id) : nowId(),
+   name: p && p.name ? String(p.name) : "Untitled",
+   parent: cleanParent(p && p.parent ? p.parent : inferParentName(p && p.name)),
+   template: p && p.template ? String(p.template) : "",
+   reference: p && p.reference ? String(p.reference) : null
+  })).filter(p=>p.template || p.name)
+ };
+}
+
+function ensurePreset(){
+ if (!data.presets.length){
+  data.presets.push({id: nowId(), name: "Untitled", parent: cleanParent(state.activeParent), template: "", reference: null});
+ }
+ data.presets.forEach(p=>{ p.parent = parentOf(p); });
+ if (!state.currentId || !data.presets.some(p=>p.id===state.currentId)){
+  const parentItems = state.activeParent ? presetsInParent(state.activeParent) : [];
+  state.currentId = (parentItems[0] || data.presets[0]).id;
+ }
+ const current = data.presets.find(p=>p.id===state.currentId) || data.presets[0];
+ state.activeParent = parentOf(current);
+}
+
+async function loadRepoPresets(){
+ const res = await fetch("presets.json", {cache:"no-store"});
+ if (!res.ok) throw new Error("HTTP " + res.status);
+ return normalizeData(await res.json());
+}
+
+function loadDraft(){
  try{
-   const res = await fetch("presets.json",{cache:"no-store"});
-   data = await res.json();
-   init();
- }catch(e){
-   alert("Could not load presets.json.");
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return null;
+  const parsed = normalizeData(JSON.parse(raw));
+  return parsed.presets.length ? parsed : null;
+ }catch(err){
+  return null;
  }
 }
 
-function init(){
- presetSelect.innerHTML="";
- data.presets.forEach(p=>{
-   let o=document.createElement("option");
-   o.value=p.id;
-   o.textContent=p.name;
-   presetSelect.appendChild(o);
- });
- render();
+function saveDraft(){
+ try{
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  localStorage.setItem(DIRTY_KEY, dirty ? "1" : "0");
+ }catch(err){}
+}
+
+function loadValues(){
+ try{
+  values = JSON.parse(localStorage.getItem(VALUES_KEY) || "{}") || {};
+ }catch(err){
+  values = {};
+ }
+}
+
+function saveValues(){
+ try{
+  localStorage.setItem(VALUES_KEY, JSON.stringify(values));
+ }catch(err){}
+}
+
+async function boot(){
+ loadValues();
+ const draft = loadDraft();
+ if (draft){
+  data = draft;
+  dirty = localStorage.getItem(DIRTY_KEY) === "1";
+  state.source = "Browser draft";
+ } else {
+  try{
+   data = await loadRepoPresets();
+   dirty = false;
+   state.source = "Repo presets";
+  }catch(err){
+   data = structuredClone(DEFAULT_DATA);
+   dirty = true;
+   state.source = "Fallback";
+  }
+ }
+ ensurePreset();
+ rerenderAll();
 }
 
 function currentPreset(){
- return data.presets.find(p=>p.id===presetSelect.value);
+ ensurePreset();
+ return data.presets.find(p=>p.id===state.currentId) || data.presets[0];
 }
 
-function detectVars(t){
- const r=/\[([^\]]+)\]/g;let m,v=[];
- while((m=r.exec(t))) if(!v.includes(m[1])) v.push(m[1]);
- return v;
+function detectVars(template){
+ const regex = /\[([^\]]+)\]/g;
+ const vars = [];
+ let match;
+ while((match = regex.exec(template || "")) !== null){
+  const name = match[1].trim();
+  if (name && !vars.includes(name)) vars.push(name);
+ }
+ return vars;
 }
 
-function render(){
- let p=currentPreset();
- if(!p) return;
+function sortedVars(vars){
+ if (ui.sortMode === "alpha") return vars.slice().sort((a,b)=>a.localeCompare(b));
+ return vars;
+}
 
- vars.innerHTML="";
- detectVars(p.template).forEach(name=>{
-   let div=document.createElement("div");div.className="field";
-   let label=document.createElement("label");label.textContent=name;
-   let input=document.createElement("input");
-   input.value=values[name]||"";
-   input.oninput=()=>{values[name]=input.value;renderOutput();};
-   div.appendChild(label);
-   div.appendChild(input);
-   vars.appendChild(div);
+function valueKey(presetId, name){
+ return presetId + "___" + name;
+}
+
+function allParents(){
+ const parents = [];
+ data.presets.forEach(p=>{
+  const parent = parentOf(p);
+  if (!parents.includes(parent)) parents.push(parent);
+ });
+ return parents;
+}
+
+function presetsInParent(parent){
+ const clean = cleanParent(parent);
+ return data.presets.filter(p=>parentOf(p) === clean);
+}
+
+function renderParentOptions(){
+ parentOptions.innerHTML = "";
+ allParents().forEach(parent=>{
+  const option = document.createElement("option");
+  option.value = parent;
+  parentOptions.appendChild(option);
+ });
+}
+
+function supportsFolderWrite(){
+ return typeof window.showDirectoryPicker === "function";
+}
+
+async function ensureWritePermission(handle){
+ const options = {mode: "readwrite"};
+ if (!handle || !handle.queryPermission || !handle.requestPermission) return false;
+ if (await handle.queryPermission(options) === "granted") return true;
+ return await handle.requestPermission(options) === "granted";
+}
+
+function imageExtension(file){
+ const name = file.name || "";
+ const ext = name.includes(".") ? name.split(".").pop().toLowerCase() : "";
+ if (["jpg","jpeg","png","webp","gif","avif"].includes(ext)) return "." + ext;
+ if (file.type === "image/jpeg") return ".jpg";
+ if (file.type === "image/png") return ".png";
+ if (file.type === "image/webp") return ".webp";
+ if (file.type === "image/gif") return ".gif";
+ if (file.type === "image/avif") return ".avif";
+ return ".png";
+}
+
+function sanitizeImageFilename(file){
+ const ext = imageExtension(file);
+ const raw = (file.name || "reference-image").replace(/\.[^.]*$/, "");
+ const base = raw
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-+|-+$/g, "")
+  .slice(0, 70) || "reference-image";
+ return base + ext;
+}
+
+async function handleExists(dirHandle, filename){
+ try{
+  await dirHandle.getFileHandle(filename, {create: false});
+  return true;
+ }catch(err){
+  if (err.name === "NotFoundError") return false;
+  throw err;
+ }
+}
+
+async function uniqueImageFilename(dirHandle, file){
+ const clean = sanitizeImageFilename(file);
+ const ext = clean.includes(".") ? clean.slice(clean.lastIndexOf(".")) : "";
+ const base = ext ? clean.slice(0, -ext.length) : clean;
+ if (!(await handleExists(dirHandle, clean))) return clean;
+ for (let i = 2; i < 1000; i++){
+  const candidate = base + "-" + i + ext;
+  if (!(await handleExists(dirHandle, candidate))) return candidate;
+ }
+ return base + "-" + Date.now().toString(36) + ext;
+}
+
+function renderFolderStatus(){
+ if (!supportsFolderWrite()){
+  folderStatus.textContent = "Direct folder save unavailable";
+  connectFolderBtn.disabled = true;
+  addImageBtn.disabled = true;
+  return;
+ }
+ connectFolderBtn.disabled = false;
+ addImageBtn.disabled = false;
+ if (imagesDirHandle){
+  folderStatus.textContent = lastImageSave || "Connected: " + (projectDirHandle?.name || "project") + "/images";
+ } else {
+  folderStatus.textContent = "Not connected";
+ }
+}
+
+async function connectProjectFolder(){
+ if (!supportsFolderWrite()){
+  alert("Direct image saving needs Chrome or Edge. You can still copy an image into /images manually and paste the path here.");
+  return false;
+ }
+ try{
+  projectDirHandle = await window.showDirectoryPicker({
+   id: "nano-prompt-project",
+   mode: "readwrite"
+  });
+  const allowed = await ensureWritePermission(projectDirHandle);
+  if (!allowed){
+   projectDirHandle = null;
+   imagesDirHandle = null;
+   renderFolderStatus();
+   alert("Folder write permission was not granted.");
+   return false;
+  }
+  imagesDirHandle = await projectDirHandle.getDirectoryHandle("images", {create: true});
+  lastImageSave = "";
+  renderFolderStatus();
+  return true;
+ }catch(err){
+  if (err.name !== "AbortError") alert("Could not connect folder: " + err.message);
+  return false;
+ }
+}
+
+async function saveReferenceImage(file){
+ if (!file) return;
+ if (!file.type.startsWith("image/")){
+  alert("Please choose an image file.");
+  return;
+ }
+ if (!imagesDirHandle){
+  const connected = await connectProjectFolder();
+  if (!connected) return;
+ }
+ try{
+  const allowed = await ensureWritePermission(projectDirHandle);
+  if (!allowed) throw new Error("Folder write permission was not granted.");
+  const filename = await uniqueImageFilename(imagesDirHandle, file);
+  const imageHandle = await imagesDirHandle.getFileHandle(filename, {create: true});
+  const writable = await imageHandle.createWritable();
+  await writable.write(file);
+  await writable.close();
+  const reference = "images/" + filename;
+  lastImageSave = "Saved: " + reference;
+  updateCurrentPreset({reference});
+  renderEditor();
+ }catch(err){
+  alert("Could not save image: " + err.message);
+  renderFolderStatus();
+ }
+}
+
+function setDirty(next=true){
+ dirty = next;
+ saveDraft();
+ renderStatus();
+}
+
+function renderStatus(){
+ statusPill.textContent = dirty ? "Export needed" : state.source;
+ statusPill.className = "pill " + (dirty ? "warn" : "good");
+}
+
+function renderPresetNavigation(){
+ ensurePreset();
+ parentStrip.innerHTML = "";
+ promptStrip.innerHTML = "";
+
+ allParents().forEach(parent=>{
+  const items = presetsInParent(parent);
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "parent-button" + (parent === state.activeParent ? " active" : "");
+  button.textContent = parent + " (" + items.length + ")";
+  button.title = parent;
+  button.onclick = ()=>{
+   state.activeParent = parent;
+   state.currentId = items[0].id;
+   rerenderAll();
+  };
+  parentStrip.appendChild(button);
  });
 
- renderOutput();
+ presetsInParent(state.activeParent).forEach(p=>{
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "prompt-button" + (p.id === state.currentId ? " active" : "") + (p.reference ? " has-reference" : "");
+  button.textContent = p.name;
+  button.title = p.name;
+  button.onclick = ()=>{
+   state.currentId = p.id;
+   state.activeParent = parentOf(p);
+   rerenderAll();
+  };
+  promptStrip.appendChild(button);
+ });
+}
 
- if(p.reference){
-   thumb.style.display="block";
-   thumbImg.src=p.reference;
-   downloadRefBtn.disabled=false;
- }else{
-   thumb.style.display="none";
-   downloadRefBtn.disabled=true;
+function renderVars(){
+ const p = currentPreset();
+ const vars = sortedVars(detectVars(p.template));
+ varsList.innerHTML = "";
+ varCount.textContent = vars.length + (vars.length === 1 ? " variable" : " variables");
+ if (!vars.length){
+  const empty = document.createElement("div");
+  empty.className = "empty-state";
+  empty.textContent = "No bracket variables in this prompt.";
+  varsList.appendChild(empty);
+  return;
  }
+ vars.forEach(name=>{
+  const field = document.createElement("div");
+  field.className = "field";
+  const label = document.createElement("label");
+  label.textContent = name;
+  const input = document.createElement("input");
+  input.value = values[valueKey(p.id, name)] || "";
+  input.autocomplete = "off";
+  input.oninput = ()=>{
+   values[valueKey(p.id, name)] = input.value;
+   saveValues();
+   renderOutput();
+  };
+  field.appendChild(label);
+  field.appendChild(input);
+  varsList.appendChild(field);
+ });
 }
 
 function renderOutput(){
- let p=currentPreset();
- let text=p.template;
-
- detectVars(p.template).forEach(name=>{
-   let val=values[name]||"";
-   if(val.trim()!==""){
-     let safe=name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-     text=text.replace(new RegExp("\\["+safe+"\\]","g"),val);
-   }
+ const p = currentPreset();
+ let text = (p.template || "").replace(/\[([^\]]+)\]/g, (full, rawName)=>{
+  const name = rawName.trim();
+  const val = values[valueKey(p.id, name)] || "";
+  return val.trim() ? val : full;
  });
-
- if(includeReferenceInstructions){
-   text += "\n\n" + REFERENCE_INSTRUCTIONS;
+ if (includeReferenceInstructions){
+  text += "\n\n" + REFERENCE_INSTRUCTIONS.trim();
  }
-
- output.value=text;
- output.style.height="auto";
- output.style.height=output.scrollHeight+"px";
+ output.value = text;
+ charCount.textContent = text.length + " chars";
+ autoGrow(output);
 }
 
-toggleRefBtn.onclick=()=>{
- includeReferenceInstructions=!includeReferenceInstructions;
- statusDot.className="status-dot "+(includeReferenceInstructions?"status-on":"status-off");
+function renderReference(){
+ const p = currentPreset();
+ if (p.reference){
+  thumb.style.display = "block";
+  thumbImg.onerror = ()=>{ thumb.style.display = "none"; };
+  thumbImg.src = p.reference;
+  downloadRefBtn.disabled = false;
+ } else {
+  thumb.style.display = "none";
+  thumbImg.removeAttribute("src");
+  downloadRefBtn.disabled = true;
+ }
+ toggleRefBtn.classList.toggle("btn-accent", includeReferenceInstructions);
+}
+
+function renderEditor(){
+ const p = currentPreset();
+ editNameInput.value = p.name || "";
+ editParentInput.value = parentOf(p);
+ editRefInput.value = p.reference || "";
+ editTemplateInput.value = p.template || "";
+ renderParentOptions();
+ renderFolderStatus();
+ renderDetectedVars();
+ const siblings = presetsInParent(parentOf(p));
+ const i = siblings.findIndex(x=>x.id===p.id);
+ moveUpBtn.disabled = i <= 0;
+ moveDownBtn.disabled = i < 0 || i >= siblings.length - 1;
+ deletePresetBtn.disabled = data.presets.length <= 1;
+}
+
+function renderDetectedVars(){
+ const p = currentPreset();
+ const vars = sortedVars(detectVars(p.template));
+ detectedVars.textContent = vars.length ? vars.join(", ") : "None";
+}
+
+function rerenderAll(){
+ document.body.classList.toggle("editing", editMode);
+ buildModeBtn.classList.toggle("active", !editMode);
+ editModeBtn.classList.toggle("active", editMode);
+ renderStatus();
+ renderPresetNavigation();
+ renderVars();
+ renderOutput();
+ renderReference();
+ renderEditor();
+}
+
+function autoGrow(el){
+ el.style.height = "auto";
+ el.style.height = Math.max(el.scrollHeight, 320) + "px";
+}
+
+function selectOutput(){
+ output.focus();
+ output.select();
+}
+
+async function copyOutput(){
+ selectOutput();
+ try{
+  await navigator.clipboard.writeText(output.value);
+ }catch(err){
+  document.execCommand("copy");
+ }
+}
+
+function buildExportObject(){
+ return {
+  version: data.version || 1,
+  updatedAt: new Date().toISOString(),
+  presets: data.presets.map(p=>({
+   id: p.id,
+   name: p.name,
+   parent: parentOf(p),
+   template: p.template,
+   reference: p.reference || null
+  }))
+ };
+}
+
+function download(filename, text){
+ const blob = new Blob([text], {type:"application/json"});
+ const a = document.createElement("a");
+ a.href = URL.createObjectURL(blob);
+ a.download = filename;
+ a.click();
+ URL.revokeObjectURL(a.href);
+}
+
+async function savePresetsJson(){
+ const text = JSON.stringify(buildExportObject(), null, 2);
+ if (!projectDirHandle){
+  download("presets.json", text);
+  state.source = "Exported JSON";
+  setDirty(false);
+  return;
+ }
+ try{
+  const allowed = await ensureWritePermission(projectDirHandle);
+  if (!allowed) throw new Error("Folder write permission was not granted.");
+  const fileHandle = await projectDirHandle.getFileHandle("presets.json", {create: true});
+  const writable = await fileHandle.createWritable();
+  await writable.write(text);
+  await writable.close();
+  state.source = "Saved to repo";
+  setDirty(false);
+ }catch(err){
+  alert("Could not save presets.json: " + err.message);
+ }
+}
+
+function updateCurrentPreset(patch){
+ const p = currentPreset();
+ if (patch.parent !== undefined){
+  patch.parent = cleanParent(patch.parent);
+  state.activeParent = patch.parent;
+ }
+ Object.assign(p, patch);
+ setDirty(true);
+ renderPresetNavigation();
+ renderVars();
+ renderOutput();
+ renderReference();
+ renderDetectedVars();
+}
+
+sortMode.onchange = ()=>{
+ ui.sortMode = sortMode.value;
+ renderVars();
+ renderDetectedVars();
+};
+
+buildModeBtn.onclick = ()=>{
+ editMode = false;
+ rerenderAll();
+};
+
+editModeBtn.onclick = ()=>{
+ editMode = true;
+ rerenderAll();
+};
+
+toggleRefBtn.onclick = ()=>{
+ includeReferenceInstructions = !includeReferenceInstructions;
+ renderOutput();
+ renderReference();
+};
+
+clearValuesBtn.onclick = ()=>{
+ const p = currentPreset();
+ detectVars(p.template).forEach(name=>delete values[valueKey(p.id, name)]);
+ saveValues();
+ renderVars();
  renderOutput();
 };
 
-copyBtn.onclick=()=>{
- navigator.clipboard.writeText(output.value);
-};
+selectAllBtn.onclick = selectOutput;
+copyBtn.onclick = copyOutput;
+copyBtn2.onclick = copyOutput;
 
-downloadRefBtn.onclick=()=>{
- let p=currentPreset();
- if(!p.reference) return;
- let a=document.createElement("a");
- a.href=p.reference;
- a.download=p.reference.split("/").pop();
+downloadRefBtn.onclick = ()=>{
+ const p = currentPreset();
+ if (!p.reference) return;
+ const a = document.createElement("a");
+ a.href = p.reference;
+ a.download = p.reference.split("/").pop() || "reference";
  a.click();
 };
 
-presetSelect.onchange=()=>{
- values={};
- render();
+editNameInput.oninput = ()=>{
+ updateCurrentPreset({name: editNameInput.value.trim() || "Untitled"});
 };
 
-loadPresets();
-</script>
+editParentInput.onchange = ()=>{
+ updateCurrentPreset({parent: editParentInput.value});
+ rerenderAll();
+};
 
+editRefInput.oninput = ()=>{
+ updateCurrentPreset({reference: editRefInput.value.trim() || null});
+};
+
+editTemplateInput.oninput = ()=>{
+ const p = currentPreset();
+ p.template = editTemplateInput.value;
+ setDirty(true);
+ renderVars();
+ renderOutput();
+ renderDetectedVars();
+};
+
+addPresetBtn.onclick = ()=>{
+ const p = {id: nowId(), name: "Untitled", parent: cleanParent(state.activeParent), template: "", reference: null};
+ data.presets.push(p);
+ state.currentId = p.id;
+ state.activeParent = parentOf(p);
+ setDirty(true);
+ rerenderAll();
+ editNameInput.focus();
+ editNameInput.select();
+};
+
+duplicatePresetBtn.onclick = ()=>{
+ const p = currentPreset();
+ const copy = {
+  id: nowId(),
+  name: p.name + " Copy",
+  parent: parentOf(p),
+  template: p.template,
+  reference: p.reference || null
+ };
+ data.presets.push(copy);
+ state.currentId = copy.id;
+ state.activeParent = parentOf(copy);
+ setDirty(true);
+ rerenderAll();
+};
+
+function swapPresets(idA, idB){
+ const indexA = data.presets.findIndex(p=>p.id===idA);
+ const indexB = data.presets.findIndex(p=>p.id===idB);
+ if (indexA < 0 || indexB < 0) return;
+ const temp = data.presets[indexA];
+ data.presets[indexA] = data.presets[indexB];
+ data.presets[indexB] = temp;
+}
+
+moveUpBtn.onclick = ()=>{
+ const siblings = presetsInParent(state.activeParent);
+ const i = siblings.findIndex(p=>p.id===state.currentId);
+ if (i <= 0) return;
+ swapPresets(siblings[i].id, siblings[i - 1].id);
+ setDirty(true);
+ rerenderAll();
+};
+
+moveDownBtn.onclick = ()=>{
+ const siblings = presetsInParent(state.activeParent);
+ const i = siblings.findIndex(p=>p.id===state.currentId);
+ if (i < 0 || i >= siblings.length - 1) return;
+ swapPresets(siblings[i].id, siblings[i + 1].id);
+ setDirty(true);
+ rerenderAll();
+};
+
+deletePresetBtn.onclick = ()=>{
+ if (data.presets.length <= 1) return;
+ const p = currentPreset();
+ if (!confirm("Delete preset '" + p.name + "'?")) return;
+ data.presets = data.presets.filter(x=>x.id!==p.id);
+ Object.keys(values).forEach(key=>{
+  if (key.startsWith(p.id + "___")) delete values[key];
+ });
+ saveValues();
+ state.currentId = data.presets[0].id;
+ state.activeParent = parentOf(data.presets[0]);
+ setDirty(true);
+ rerenderAll();
+};
+
+connectFolderBtn.onclick = connectProjectFolder;
+
+addImageBtn.onclick = async ()=>{
+ if (!supportsFolderWrite()){
+  alert("Direct image saving needs Chrome or Edge. You can still copy an image into /images manually and paste the path here.");
+  return;
+ }
+ if (!imagesDirHandle){
+  const connected = await connectProjectFolder();
+  if (!connected) return;
+ }
+ imageInput.click();
+};
+
+imageInput.onchange = async e=>{
+ const file = e.target.files[0];
+ e.target.value = "";
+ await saveReferenceImage(file);
+};
+
+importBtn.onclick = ()=>jsonInput.click();
+
+jsonInput.onchange = e=>{
+ const file = e.target.files[0];
+ if (!file) return;
+ const reader = new FileReader();
+ reader.onload = evt=>{
+  try{
+   const imported = normalizeData(JSON.parse(evt.target.result));
+   if (!imported.presets.length) throw new Error("No presets found");
+   data = imported;
+   state.currentId = data.presets[0].id;
+   state.activeParent = parentOf(data.presets[0]);
+   state.source = "Imported JSON";
+   dirty = false;
+   saveDraft();
+   rerenderAll();
+  }catch(err){
+   alert("Could not import JSON: " + err.message);
+  }
+ };
+ reader.readAsText(file);
+ jsonInput.value = "";
+};
+
+exportBtn.onclick = savePresetsJson;
+
+reloadRepoBtn.onclick = async ()=>{
+ if (dirty && !confirm("Reload presets.json and discard the browser draft?")) return;
+ try{
+  data = await loadRepoPresets();
+  state.currentId = data.presets[0].id;
+  state.activeParent = parentOf(data.presets[0]);
+  state.source = "Repo presets";
+  dirty = false;
+  saveDraft();
+  rerenderAll();
+ }catch(err){
+  alert("Could not reload presets.json: " + err.message);
+ }
+};
+
+window.addEventListener("beforeunload", e=>{
+ if (!dirty) return;
+ e.preventDefault();
+ e.returnValue = "";
+});
+
+sortMode.value = ui.sortMode;
+boot();
+</script>
 </body>
 </html>
