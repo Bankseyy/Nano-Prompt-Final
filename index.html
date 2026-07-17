@@ -227,6 +227,33 @@ body.editing .editor-panel{display:block}
 
 .hidden-file{display:none}
 
+dialog{
+ width:min(560px,calc(100vw - 28px));
+ border:1px solid var(--border);
+ border-radius:var(--radius);
+ background:var(--panel);
+ color:var(--text);
+ padding:0;
+ box-shadow:0 24px 80px #000b;
+}
+dialog::backdrop{background:#000a}
+.dialog-header{
+ padding:14px 16px;
+ border-bottom:1px solid var(--border);
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ gap:12px;
+}
+.dialog-body{padding:16px}
+.dialog-body p{color:var(--muted);line-height:1.5;margin:0 0 14px}
+.dialog-body a{color:var(--accent)}
+.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}
+.check-row{display:flex;align-items:flex-start;gap:8px;color:var(--muted);font-size:13px}
+.check-row input{width:auto;min-height:auto;margin-top:3px}
+.connection-status{font-size:13px;min-height:20px;color:var(--muted)}
+.connection-status.error{color:var(--danger)}
+
 @media (max-width:900px){
  .wrap{margin-top:10px;padding-inline:10px}
  .grid,.editor-grid{grid-template-columns:1fr}
@@ -314,7 +341,9 @@ body.editing .editor-panel{display:block}
     <button id="connectFolderBtn" type="button">Connect Folder</button>
     <button id="addImageBtn" type="button">Add Image</button>
     <button id="importBtn" type="button">Import JSON</button>
-    <button id="exportBtn" class="btn-accent" type="button">Save presets.json</button>
+    <button id="connectGithubBtn" type="button">Connect GitHub</button>
+    <button id="exportBtn" class="btn-accent" type="button">Save to GitHub</button>
+    <button id="downloadJsonBtn" type="button">Download JSON</button>
     <button id="reloadRepoBtn" type="button">Reload Repo</button>
     <input class="hidden-file" type="file" id="jsonInput" accept="application/json">
     <input class="hidden-file" type="file" id="imageInput" accept="image/*">
@@ -354,10 +383,50 @@ body.editing .editor-panel{display:block}
  </section>
 </div>
 
+<dialog id="githubDialog">
+ <div class="dialog-header">
+  <strong>Connect GitHub</strong>
+  <button id="closeGithubDialogBtn" type="button" aria-label="Close">Close</button>
+ </div>
+ <form id="githubForm" class="dialog-body">
+  <p>
+   Connect this browser to <strong>Bankseyy/Nano-Prompt-Final</strong>. Create a
+   fine-grained token for only this repository with <strong>Contents: Read and write</strong>,
+   then paste it below. The token is sent only to GitHub's API and is never included in presets.json.
+  </p>
+  <p>
+   <a id="createGithubTokenLink" href="https://github.com/settings/personal-access-tokens/new?name=Nano%20Prompt%20Studio&amp;description=Save%20Nano%20Prompt%20Studio%20presets&amp;target_name=Bankseyy&amp;expires_in=90&amp;contents=write" target="_blank" rel="noopener noreferrer">Create the restricted token on GitHub</a>
+   and choose <strong>Only select repositories → Nano-Prompt-Final</strong>.
+  </p>
+  <div class="field">
+   <label for="githubTokenInput">Fine-grained personal access token</label>
+   <input id="githubTokenInput" type="password" autocomplete="off" placeholder="github_pat_…">
+  </div>
+  <label class="check-row" for="rememberGithubToken">
+   <input id="rememberGithubToken" type="checkbox">
+   <span>Remember on this device. Leave off on a shared machine; otherwise the connection lasts only for this browser session.</span>
+  </label>
+  <div id="githubConnectionStatus" class="connection-status" role="status"></div>
+  <div class="dialog-actions">
+   <button id="disconnectGithubBtn" class="btn-danger" type="button">Disconnect</button>
+   <button id="cancelGithubBtn" type="button">Cancel</button>
+   <button id="confirmGithubBtn" class="btn-accent" type="submit">Connect</button>
+  </div>
+ </form>
+</dialog>
+
 <script>
 const STORAGE_KEY = "nano_prompt_studio_data_v1";
 const VALUES_KEY = "nano_prompt_studio_values_v1";
 const DIRTY_KEY = "nano_prompt_studio_dirty_v1";
+const REPO_SHA_KEY = "nano_prompt_studio_repo_sha_v1";
+const GITHUB_TOKEN_SESSION_KEY = "nano_prompt_studio_github_token_session_v1";
+const GITHUB_TOKEN_LOCAL_KEY = "nano_prompt_studio_github_token_local_v1";
+const GITHUB_OWNER = "Bankseyy";
+const GITHUB_REPO = "Nano-Prompt-Final";
+const GITHUB_BRANCH = "main";
+const GITHUB_PRESETS_PATH = "presets.json";
+const GITHUB_API_VERSION = "2026-03-10";
 
 const DEFAULT_DATA = {
  version: 1,
@@ -415,6 +484,9 @@ let state = { currentId: null, activeParent: null, source: "Loading" };
 let projectDirHandle = null;
 let imagesDirHandle = null;
 let lastImageSave = "";
+let repoFileSha = null;
+let githubDialogResolve = null;
+let saveInProgress = false;
 
 function nowId(){
  return "p_" + Math.random().toString(36).slice(2,10) + "_" + Date.now().toString(36);
@@ -463,10 +535,105 @@ function ensurePreset(){
  state.activeParent = parentOf(current);
 }
 
+function getGithubToken(){
+ try{
+  return sessionStorage.getItem(GITHUB_TOKEN_SESSION_KEY) || localStorage.getItem(GITHUB_TOKEN_LOCAL_KEY) || "";
+ }catch(err){
+  return "";
+ }
+}
+
+function storeGithubToken(token, remember){
+ try{
+  sessionStorage.removeItem(GITHUB_TOKEN_SESSION_KEY);
+  localStorage.removeItem(GITHUB_TOKEN_LOCAL_KEY);
+  if (token){
+   (remember ? localStorage : sessionStorage).setItem(
+    remember ? GITHUB_TOKEN_LOCAL_KEY : GITHUB_TOKEN_SESSION_KEY,
+    token
+   );
+  }
+ }catch(err){}
+ renderGithubConnection();
+}
+
+function githubApiUrl(path=GITHUB_PRESETS_PATH, includeRef=true){
+ const url = "https://api.github.com/repos/" + encodeURIComponent(GITHUB_OWNER) + "/" +
+  encodeURIComponent(GITHUB_REPO) + "/contents/" + path.split("/").map(encodeURIComponent).join("/") +
+  (includeRef ? "?ref=" + encodeURIComponent(GITHUB_BRANCH) : "");
+ return url;
+}
+
+function githubHeaders(token=""){
+ const headers = {
+  "Accept": "application/vnd.github+json",
+  "X-GitHub-Api-Version": GITHUB_API_VERSION
+ };
+ if (token) headers.Authorization = "Bearer " + token;
+ return headers;
+}
+
+function decodeBase64Utf8(encoded){
+ const binary = atob(String(encoded || "").replace(/\s/g, ""));
+ const bytes = Uint8Array.from(binary, char=>char.charCodeAt(0));
+ return new TextDecoder().decode(bytes);
+}
+
+function encodeBase64Utf8(text){
+ const bytes = new TextEncoder().encode(text);
+ let binary = "";
+ const chunkSize = 0x8000;
+ for (let i = 0; i < bytes.length; i += chunkSize){
+  binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+ }
+ return btoa(binary);
+}
+
+async function githubError(response, fallback){
+ let detail = "";
+ try{
+  const body = await response.json();
+  detail = body && body.message ? ": " + body.message : "";
+ }catch(err){}
+ const error = new Error(fallback + " (HTTP " + response.status + ")" + detail);
+ error.status = response.status;
+ return error;
+}
+
+async function fetchGithubPresetFile(token=""){
+ const response = await fetch(githubApiUrl(), {
+  headers: githubHeaders(token),
+  cache: "no-store"
+ });
+ if (!response.ok) throw await githubError(response, "Could not read presets.json from GitHub");
+ const file = await response.json();
+ if (!file.content || !file.sha) throw new Error("GitHub returned an invalid presets.json response.");
+ return {
+  data: normalizeData(JSON.parse(decodeBase64Utf8(file.content))),
+  sha: file.sha
+ };
+}
+
 async function loadRepoPresets(){
- const res = await fetch("presets.json", {cache:"no-store"});
- if (!res.ok) throw new Error("HTTP " + res.status);
- return normalizeData(await res.json());
+ const token = getGithubToken();
+ try{
+  const remote = await fetchGithubPresetFile(token);
+  repoFileSha = remote.sha;
+  return remote.data;
+ }catch(githubErr){
+  if (token && githubErr.status === 401){
+   storeGithubToken("", false);
+   try{
+    const remote = await fetchGithubPresetFile();
+    repoFileSha = remote.sha;
+    return remote.data;
+   }catch(err){}
+  }
+  const response = await fetch("presets.json", {cache:"no-store"});
+  if (!response.ok) throw githubErr;
+  repoFileSha = null;
+  return normalizeData(await response.json());
+ }
 }
 
 function loadDraft(){
@@ -484,6 +651,8 @@ function saveDraft(){
  try{
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   localStorage.setItem(DIRTY_KEY, dirty ? "1" : "0");
+  if (repoFileSha) localStorage.setItem(REPO_SHA_KEY, repoFileSha);
+  else localStorage.removeItem(REPO_SHA_KEY);
  }catch(err){}
 }
 
@@ -504,16 +673,27 @@ function saveValues(){
 async function boot(){
  loadValues();
  const draft = loadDraft();
- if (draft){
-  data = draft;
-  dirty = localStorage.getItem(DIRTY_KEY) === "1";
-  state.source = "Browser draft";
- } else {
-  try{
-   data = await loadRepoPresets();
+ const draftIsDirty = !!draft && localStorage.getItem(DIRTY_KEY) === "1";
+ const draftRepoFileSha = draftIsDirty ? localStorage.getItem(REPO_SHA_KEY) : null;
+ try{
+  const remote = await loadRepoPresets();
+  if (draftIsDirty){
+   data = draft;
+   repoFileSha = draftRepoFileSha;
+   dirty = true;
+   state.source = "Unsaved browser draft";
+  } else {
+   data = remote;
    dirty = false;
-   state.source = "Repo presets";
-  }catch(err){
+   state.source = "GitHub presets";
+   saveDraft();
+  }
+ }catch(err){
+  if (draft){
+   data = draft;
+   dirty = draftIsDirty;
+   state.source = draftIsDirty ? "Unsaved browser draft" : "Offline browser copy";
+  } else {
    data = structuredClone(DEFAULT_DATA);
    dirty = true;
    state.source = "Fallback";
@@ -706,8 +886,19 @@ function setDirty(next=true){
 }
 
 function renderStatus(){
- statusPill.textContent = dirty ? "Export needed" : state.source;
- statusPill.className = "pill " + (dirty ? "warn" : "good");
+ statusPill.textContent = saveInProgress ? "Saving to GitHub…" : (dirty ? "Unsaved changes" : state.source);
+ statusPill.className = "pill " + (dirty || saveInProgress ? "warn" : "good");
+ exportBtn.disabled = saveInProgress;
+ renderGithubConnection();
+}
+
+function renderGithubConnection(){
+ const connected = !!getGithubToken();
+ if (typeof connectGithubBtn !== "undefined"){
+  connectGithubBtn.textContent = connected ? "GitHub Connected" : "Connect GitHub";
+  connectGithubBtn.classList.toggle("btn-accent", connected);
+ }
+ if (typeof disconnectGithubBtn !== "undefined") disconnectGithubBtn.style.display = connected ? "" : "none";
 }
 
 function renderPresetNavigation(){
@@ -882,12 +1073,12 @@ function download(filename, text){
  URL.revokeObjectURL(a.href);
 }
 
-async function savePresetsJson(){
+async function saveLocalPresetsJson(){
  const text = JSON.stringify(buildExportObject(), null, 2);
  if (!projectDirHandle){
   download("presets.json", text);
-  state.source = "Exported JSON";
-  setDirty(false);
+  state.source = "Downloaded JSON; GitHub save needed";
+  renderStatus();
   return;
  }
  try{
@@ -897,10 +1088,98 @@ async function savePresetsJson(){
   const writable = await fileHandle.createWritable();
   await writable.write(text);
   await writable.close();
-  state.source = "Saved to repo";
-  setDirty(false);
+  state.source = "Saved locally; GitHub save needed";
+  renderStatus();
  }catch(err){
   alert("Could not save presets.json: " + err.message);
+ }
+}
+
+function finishGithubDialog(token=null){
+ if (githubDialog.open) githubDialog.close();
+ const resolve = githubDialogResolve;
+ githubDialogResolve = null;
+ if (resolve) resolve(token);
+}
+
+function showGithubDialog(){
+ if (githubDialogResolve) return Promise.resolve(null);
+ githubTokenInput.value = "";
+ rememberGithubToken.checked = !!localStorage.getItem(GITHUB_TOKEN_LOCAL_KEY);
+ githubConnectionStatus.textContent = getGithubToken()
+  ? "This browser is connected. Paste a new token only if you want to replace it."
+  : "";
+ githubConnectionStatus.className = "connection-status";
+ confirmGithubBtn.textContent = getGithubToken() ? "Keep Connected" : "Connect";
+ renderGithubConnection();
+ githubDialog.showModal();
+ if (!getGithubToken()) githubTokenInput.focus();
+ return new Promise(resolve=>{ githubDialogResolve = resolve; });
+}
+
+async function validateGithubToken(token){
+ await fetchGithubPresetFile(token);
+ return true;
+}
+
+async function requireGithubToken(){
+ const existing = getGithubToken();
+ if (existing) return existing;
+ return await showGithubDialog();
+}
+
+async function savePresetsToGithub(){
+ const token = await requireGithubToken();
+ if (!token) return;
+ saveInProgress = true;
+ renderStatus();
+ try{
+  const remote = await fetchGithubPresetFile(token);
+  if (repoFileSha && remote.sha !== repoFileSha){
+   const error = new Error("presets.json changed on GitHub after this page loaded. Download your JSON as a backup, then reload the repo and reapply your changes.");
+   error.status = 409;
+   throw error;
+  }
+  if (!repoFileSha && data.updatedAt !== remote.data.updatedAt){
+   const error = new Error("Your browser draft was based on a different version of presets.json. Download your JSON as a backup, then reload the repo and reapply your changes.");
+   error.status = 409;
+   throw error;
+  }
+
+  const exported = buildExportObject();
+  const text = JSON.stringify(exported, null, 2) + "\n";
+  const response = await fetch(githubApiUrl(GITHUB_PRESETS_PATH, false), {
+   method: "PUT",
+   headers: {
+    ...githubHeaders(token),
+    "Content-Type": "application/json"
+   },
+   body: JSON.stringify({
+    message: "Update presets.json from Prompt Studio",
+    content: encodeBase64Utf8(text),
+    sha: remote.sha,
+    branch: GITHUB_BRANCH
+   })
+  });
+  if (!response.ok) throw await githubError(response, "GitHub could not save presets.json");
+  const result = await response.json();
+  repoFileSha = result.content && result.content.sha ? result.content.sha : null;
+  data = normalizeData(exported);
+  state.source = "Saved to GitHub";
+  dirty = false;
+  saveDraft();
+  rerenderAll();
+ }catch(err){
+  if (err.status === 401){
+   storeGithubToken("", false);
+  }
+  const hint = err.status === 403
+   ? "\n\nCheck that the token is approved and has Contents: Read and write access to Nano-Prompt-Final."
+   : "";
+  alert(err.message + hint);
+ }finally{
+  saveInProgress = false;
+  renderStatus();
  }
 }
 
@@ -1098,7 +1377,55 @@ jsonInput.onchange = e=>{
  jsonInput.value = "";
 };
 
-exportBtn.onclick = savePresetsJson;
+connectGithubBtn.onclick = ()=>{ showGithubDialog(); };
+
+closeGithubDialogBtn.onclick = ()=>finishGithubDialog(null);
+cancelGithubBtn.onclick = ()=>finishGithubDialog(null);
+
+githubDialog.addEventListener("cancel", event=>{
+ event.preventDefault();
+ finishGithubDialog(null);
+});
+
+disconnectGithubBtn.onclick = ()=>{
+ storeGithubToken("", false);
+ githubConnectionStatus.textContent = "Disconnected from GitHub on this browser.";
+ finishGithubDialog(null);
+};
+
+githubForm.onsubmit = async event=>{
+ event.preventDefault();
+ const enteredToken = githubTokenInput.value.trim();
+ const existingToken = getGithubToken();
+ if (!enteredToken && existingToken){
+  finishGithubDialog(existingToken);
+  return;
+ }
+ if (!enteredToken){
+  githubConnectionStatus.textContent = "Paste a fine-grained GitHub token first.";
+  githubConnectionStatus.className = "connection-status error";
+  githubTokenInput.focus();
+  return;
+ }
+ confirmGithubBtn.disabled = true;
+ githubConnectionStatus.textContent = "Checking repository access…";
+ githubConnectionStatus.className = "connection-status";
+ try{
+  await validateGithubToken(enteredToken);
+  storeGithubToken(enteredToken, rememberGithubToken.checked);
+  finishGithubDialog(enteredToken);
+ }catch(err){
+  githubConnectionStatus.textContent = err.status === 403
+   ? "Access denied. Give the token Contents: Read and write access to Nano-Prompt-Final."
+   : err.message;
+  githubConnectionStatus.className = "connection-status error";
+ }finally{
+  confirmGithubBtn.disabled = false;
+ }
+};
+
+exportBtn.onclick = savePresetsToGithub;
+downloadJsonBtn.onclick = saveLocalPresetsJson;
 
 reloadRepoBtn.onclick = async ()=>{
  if (dirty && !confirm("Reload presets.json and discard the browser draft?")) return;
@@ -1106,7 +1433,7 @@ reloadRepoBtn.onclick = async ()=>{
   data = await loadRepoPresets();
   state.currentId = data.presets[0].id;
   state.activeParent = parentOf(data.presets[0]);
-  state.source = "Repo presets";
+  state.source = "GitHub presets";
   dirty = false;
   saveDraft();
   rerenderAll();
