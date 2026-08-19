@@ -337,7 +337,7 @@ dialog::backdrop{background:#000a}
       <input id="editRefInput" placeholder="images/example.png" autocomplete="off">
      </div>
      <div class="field">
-      <label>Image Folder</label>
+      <label>Image Storage</label>
       <div class="empty-state" id="folderStatus">Not connected</div>
      </div>
      <div class="field">
@@ -416,10 +416,12 @@ dialog::backdrop{background:#000a}
 </dialog>
 
 <script>
-const STORAGE_KEY = "nano_prompt_studio_data_v1";
 const VALUES_KEY = "nano_prompt_studio_values_v1";
-const DIRTY_KEY = "nano_prompt_studio_dirty_v1";
-const REPO_SHA_KEY = "nano_prompt_studio_repo_sha_v1";
+const LEGACY_LIBRARY_KEYS = [
+ "nano_prompt_studio_data_v1",
+ "nano_prompt_studio_dirty_v1",
+ "nano_prompt_studio_repo_sha_v1"
+];
 const GITHUB_TOKEN_SESSION_KEY = "nano_prompt_studio_github_token_session_v1";
 const GITHUB_TOKEN_LOCAL_KEY = "nano_prompt_studio_github_token_local_v1";
 const GITHUB_OWNER = "Bankseyy";
@@ -589,6 +591,16 @@ function encodeBase64Utf8(text){
  return btoa(binary);
 }
 
+async function encodeFileBase64(file){
+ const bytes = new Uint8Array(await file.arrayBuffer());
+ let binary = "";
+ const chunkSize = 0x8000;
+ for (let i = 0; i < bytes.length; i += chunkSize){
+  binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+ }
+ return btoa(binary);
+}
+
 async function githubError(response, fallback){
  let detail = "";
  try{
@@ -636,23 +648,19 @@ async function loadRepoPresets(){
  }
 }
 
-function loadDraft(){
- try{
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return null;
-  const parsed = normalizeData(JSON.parse(raw));
-  return parsed.presets.length ? parsed : null;
- }catch(err){
-  return null;
- }
+async function githubPathExists(path, token){
+ const response = await fetch(githubApiUrl(path), {
+  headers: githubHeaders(token),
+  cache: "no-store"
+ });
+ if (response.ok) return true;
+ if (response.status === 404) return false;
+ throw await githubError(response, "Could not check GitHub path " + path);
 }
 
-function saveDraft(){
+function clearLegacyPromptLibrary(){
  try{
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  localStorage.setItem(DIRTY_KEY, dirty ? "1" : "0");
-  if (repoFileSha) localStorage.setItem(REPO_SHA_KEY, repoFileSha);
-  else localStorage.removeItem(REPO_SHA_KEY);
+  LEGACY_LIBRARY_KEYS.forEach(key=>localStorage.removeItem(key));
  }catch(err){}
 }
 
@@ -672,32 +680,15 @@ function saveValues(){
 
 async function boot(){
  loadValues();
- const draft = loadDraft();
- const draftIsDirty = !!draft && localStorage.getItem(DIRTY_KEY) === "1";
- const draftRepoFileSha = draftIsDirty ? localStorage.getItem(REPO_SHA_KEY) : null;
+ clearLegacyPromptLibrary();
  try{
-  const remote = await loadRepoPresets();
-  if (draftIsDirty){
-   data = draft;
-   repoFileSha = draftRepoFileSha;
-   dirty = true;
-   state.source = "Unsaved browser draft";
-  } else {
-   data = remote;
-   dirty = false;
-   state.source = "GitHub presets";
-   saveDraft();
-  }
+  data = await loadRepoPresets();
+  dirty = false;
+  state.source = repoFileSha ? "GitHub presets" : "Published presets";
  }catch(err){
-  if (draft){
-   data = draft;
-   dirty = draftIsDirty;
-   state.source = draftIsDirty ? "Unsaved browser draft" : "Offline browser copy";
-  } else {
-   data = structuredClone(DEFAULT_DATA);
-   dirty = true;
-   state.source = "Fallback";
-  }
+  data = structuredClone(DEFAULT_DATA);
+  dirty = true;
+  state.source = "Could not load library";
  }
  ensurePreset();
  rerenderAll();
@@ -807,19 +798,31 @@ async function uniqueImageFilename(dirHandle, file){
  return base + "-" + Date.now().toString(36) + ext;
 }
 
-function renderFolderStatus(){
- if (!supportsFolderWrite()){
-  folderStatus.textContent = "Direct folder save unavailable";
-  connectFolderBtn.disabled = true;
-  addImageBtn.disabled = true;
-  return;
+async function uniqueGithubImageFilename(file, token){
+ const clean = sanitizeImageFilename(file);
+ const ext = clean.includes(".") ? clean.slice(clean.lastIndexOf(".")) : "";
+ const base = ext ? clean.slice(0, -ext.length) : clean;
+ if (!(await githubPathExists("images/" + clean, token))) return clean;
+ for (let i = 2; i < 1000; i++){
+  const candidate = base + "-" + i + ext;
+  if (!(await githubPathExists("images/" + candidate, token))) return candidate;
  }
- connectFolderBtn.disabled = false;
- addImageBtn.disabled = false;
- if (imagesDirHandle){
-  folderStatus.textContent = lastImageSave || "Connected: " + (projectDirHandle?.name || "project") + "/images";
+ return base + "-" + Date.now().toString(36) + ext;
+}
+
+function renderFolderStatus(){
+ connectFolderBtn.disabled = !supportsFolderWrite();
+ addImageBtn.disabled = saveInProgress;
+ if (lastImageSave){
+  folderStatus.textContent = lastImageSave;
+ } else if (getGithubToken()){
+  folderStatus.textContent = "GitHub upload enabled";
+ } else if (imagesDirHandle){
+  folderStatus.textContent = "Connected locally: " + (projectDirHandle?.name || "project") + "/images";
+ } else if (supportsFolderWrite()){
+  folderStatus.textContent = "Connect GitHub for shared images, or connect a local folder";
  } else {
-  folderStatus.textContent = "Not connected";
+  folderStatus.textContent = "Connect GitHub to upload shared images";
  }
 }
 
@@ -851,7 +854,7 @@ async function connectProjectFolder(){
  }
 }
 
-async function saveReferenceImage(file){
+async function saveReferenceImageLocally(file){
  if (!file) return;
  if (!file.type.startsWith("image/")){
   alert("Please choose an image file.");
@@ -879,9 +882,66 @@ async function saveReferenceImage(file){
  }
 }
 
+async function saveReferenceImageToGithub(file){
+ if (!file) return false;
+ if (!file.type.startsWith("image/")){
+  alert("Please choose an image file.");
+  return false;
+ }
+ const token = await requireGithubToken();
+ if (!token) return false;
+ saveInProgress = true;
+ renderStatus();
+ try{
+  const filename = await uniqueGithubImageFilename(file, token);
+  const reference = "images/" + filename;
+  const response = await fetch(githubApiUrl(reference, false), {
+   method: "PUT",
+   headers: {
+    ...githubHeaders(token),
+    "Content-Type": "application/json"
+   },
+   body: JSON.stringify({
+    message: "Add reference image " + filename,
+    content: await encodeFileBase64(file),
+    branch: GITHUB_BRANCH
+   })
+  });
+  if (!response.ok) throw await githubError(response, "GitHub could not upload the reference image");
+  lastImageSave = "Uploaded: " + reference;
+  updateCurrentPreset({reference});
+  state.source = "Image uploaded; save prompt";
+  renderFolderStatus();
+  return true;
+ }catch(err){
+  if (err.status === 401) storeGithubToken("", false);
+  const hint = err.status === 403
+   ? "\n\nCheck that the token has Contents: Read and write access to Nano-Prompt-Final."
+   : "";
+  alert(err.message + hint);
+  renderFolderStatus();
+  return false;
+ }finally{
+  saveInProgress = false;
+  renderStatus();
+ }
+}
+
+async function saveReferenceImage(file){
+ if (getGithubToken() || !supportsFolderWrite()){
+  await saveReferenceImageToGithub(file);
+  return;
+ }
+ const useGithub = confirm("Upload this image to GitHub so it works on every device?");
+ if (useGithub){
+  await saveReferenceImageToGithub(file);
+  return;
+ }
+ await saveReferenceImageLocally(file);
+}
+
 function setDirty(next=true){
  dirty = next;
- saveDraft();
  renderStatus();
 }
 
@@ -1141,7 +1201,7 @@ async function savePresetsToGithub(){
    throw error;
   }
   if (!repoFileSha && data.updatedAt !== remote.data.updatedAt){
-   const error = new Error("Your browser draft was based on a different version of presets.json. Download your JSON as a backup, then reload the repo and reapply your changes.");
+   const error = new Error("This page was loaded from a different version of presets.json. Download your JSON as a backup, then reload the repo and reapply your changes.");
    error.status = 409;
    throw error;
   }
@@ -1167,7 +1227,7 @@ async function savePresetsToGithub(){
   data = normalizeData(exported);
   state.source = "Saved to GitHub";
   dirty = false;
-  saveDraft();
+  clearLegacyPromptLibrary();
   rerenderAll();
  }catch(err){
   if (err.status === 401){
@@ -1335,14 +1395,6 @@ deletePresetBtn.onclick = ()=>{
 connectFolderBtn.onclick = connectProjectFolder;
 
 addImageBtn.onclick = async ()=>{
- if (!supportsFolderWrite()){
-  alert("Direct image saving needs Chrome or Edge. You can still copy an image into /images manually and paste the path here.");
-  return;
- }
- if (!imagesDirHandle){
-  const connected = await connectProjectFolder();
-  if (!connected) return;
- }
  imageInput.click();
 };
 
@@ -1365,9 +1417,8 @@ jsonInput.onchange = e=>{
    data = imported;
    state.currentId = data.presets[0].id;
    state.activeParent = parentOf(data.presets[0]);
-   state.source = "Imported JSON";
-   dirty = false;
-   saveDraft();
+   state.source = "Imported JSON; save to GitHub";
+   dirty = true;
    rerenderAll();
   }catch(err){
    alert("Could not import JSON: " + err.message);
@@ -1428,14 +1479,14 @@ exportBtn.onclick = savePresetsToGithub;
 downloadJsonBtn.onclick = saveLocalPresetsJson;
 
 reloadRepoBtn.onclick = async ()=>{
- if (dirty && !confirm("Reload presets.json and discard the browser draft?")) return;
+ if (dirty && !confirm("Reload presets.json and discard unsaved changes?")) return;
  try{
   data = await loadRepoPresets();
   state.currentId = data.presets[0].id;
   state.activeParent = parentOf(data.presets[0]);
   state.source = "GitHub presets";
   dirty = false;
-  saveDraft();
+  clearLegacyPromptLibrary();
   rerenderAll();
  }catch(err){
   alert("Could not reload presets.json: " + err.message);
