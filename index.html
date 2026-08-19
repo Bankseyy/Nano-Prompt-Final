@@ -309,7 +309,6 @@ dialog::backdrop{background:#000a}
     <button id="moveUpBtn" type="button">Move Up</button>
     <button id="moveDownBtn" type="button">Move Down</button>
     <button id="deletePresetBtn" class="btn-danger" type="button">Delete</button>
-    <button id="connectFolderBtn" type="button">Connect Folder</button>
     <button id="addImageBtn" type="button">Add Image</button>
     <button id="importBtn" type="button">Import JSON</button>
     <button id="connectGithubBtn" type="button">Connect GitHub</button>
@@ -483,8 +482,6 @@ let editMode = false;
 let includeReferenceInstructions = false;
 let ui = { sortMode: "appearance" };
 let state = { currentId: null, activeParent: null, source: "Loading" };
-let projectDirHandle = null;
-let imagesDirHandle = null;
 let lastImageSave = "";
 let repoFileSha = null;
 let githubDialogResolve = null;
@@ -742,17 +739,6 @@ function renderParentOptions(){
  });
 }
 
-function supportsFolderWrite(){
- return typeof window.showDirectoryPicker === "function";
-}
-
-async function ensureWritePermission(handle){
- const options = {mode: "readwrite"};
- if (!handle || !handle.queryPermission || !handle.requestPermission) return false;
- if (await handle.queryPermission(options) === "granted") return true;
- return await handle.requestPermission(options) === "granted";
-}
-
 function imageExtension(file){
  const name = file.name || "";
  const ext = name.includes(".") ? name.split(".").pop().toLowerCase() : "";
@@ -776,28 +762,6 @@ function sanitizeImageFilename(file){
  return base + ext;
 }
 
-async function handleExists(dirHandle, filename){
- try{
-  await dirHandle.getFileHandle(filename, {create: false});
-  return true;
- }catch(err){
-  if (err.name === "NotFoundError") return false;
-  throw err;
- }
-}
-
-async function uniqueImageFilename(dirHandle, file){
- const clean = sanitizeImageFilename(file);
- const ext = clean.includes(".") ? clean.slice(clean.lastIndexOf(".")) : "";
- const base = ext ? clean.slice(0, -ext.length) : clean;
- if (!(await handleExists(dirHandle, clean))) return clean;
- for (let i = 2; i < 1000; i++){
-  const candidate = base + "-" + i + ext;
-  if (!(await handleExists(dirHandle, candidate))) return candidate;
- }
- return base + "-" + Date.now().toString(36) + ext;
-}
-
 async function uniqueGithubImageFilename(file, token){
  const clean = sanitizeImageFilename(file);
  const ext = clean.includes(".") ? clean.slice(clean.lastIndexOf(".")) : "";
@@ -811,74 +775,13 @@ async function uniqueGithubImageFilename(file, token){
 }
 
 function renderFolderStatus(){
- connectFolderBtn.disabled = !supportsFolderWrite();
  addImageBtn.disabled = saveInProgress;
  if (lastImageSave){
   folderStatus.textContent = lastImageSave;
  } else if (getGithubToken()){
   folderStatus.textContent = "GitHub upload enabled";
- } else if (imagesDirHandle){
-  folderStatus.textContent = "Connected locally: " + (projectDirHandle?.name || "project") + "/images";
- } else if (supportsFolderWrite()){
-  folderStatus.textContent = "Connect GitHub for shared images, or connect a local folder";
  } else {
   folderStatus.textContent = "Connect GitHub to upload shared images";
- }
-}
-
-async function connectProjectFolder(){
- if (!supportsFolderWrite()){
-  alert("Direct image saving needs Chrome or Edge. You can still copy an image into /images manually and paste the path here.");
-  return false;
- }
- try{
-  projectDirHandle = await window.showDirectoryPicker({
-   id: "nano-prompt-project",
-   mode: "readwrite"
-  });
-  const allowed = await ensureWritePermission(projectDirHandle);
-  if (!allowed){
-   projectDirHandle = null;
-   imagesDirHandle = null;
-   renderFolderStatus();
-   alert("Folder write permission was not granted.");
-   return false;
-  }
-  imagesDirHandle = await projectDirHandle.getDirectoryHandle("images", {create: true});
-  lastImageSave = "";
-  renderFolderStatus();
-  return true;
- }catch(err){
-  if (err.name !== "AbortError") alert("Could not connect folder: " + err.message);
-  return false;
- }
-}
-
-async function saveReferenceImageLocally(file){
- if (!file) return;
- if (!file.type.startsWith("image/")){
-  alert("Please choose an image file.");
-  return;
- }
- if (!imagesDirHandle){
-  const connected = await connectProjectFolder();
-  if (!connected) return;
- }
- try{
-  const allowed = await ensureWritePermission(projectDirHandle);
-  if (!allowed) throw new Error("Folder write permission was not granted.");
-  const filename = await uniqueImageFilename(imagesDirHandle, file);
-  const imageHandle = await imagesDirHandle.getFileHandle(filename, {create: true});
-  const writable = await imageHandle.createWritable();
-  await writable.write(file);
-  await writable.close();
-  const reference = "images/" + filename;
-  lastImageSave = "Saved: " + reference;
-  updateCurrentPreset({reference});
-  renderEditor();
- }catch(err){
-  alert("Could not save image: " + err.message);
-  renderFolderStatus();
  }
 }
 
@@ -928,16 +831,7 @@ async function saveReferenceImageToGithub(file){
 }
 
 async function saveReferenceImage(file){
- if (getGithubToken() || !supportsFolderWrite()){
-  await saveReferenceImageToGithub(file);
-  return;
- }
- const useGithub = confirm("Upload this image to GitHub so it works on every device?");
- if (useGithub){
-  await saveReferenceImageToGithub(file);
-  return;
- }
- await saveReferenceImageLocally(file);
+ await saveReferenceImageToGithub(file);
 }
 
 function setDirty(next=true){
@@ -1135,24 +1029,9 @@ function download(filename, text){
 
 async function saveLocalPresetsJson(){
  const text = JSON.stringify(buildExportObject(), null, 2);
- if (!projectDirHandle){
-  download("presets.json", text);
-  state.source = "Downloaded JSON; GitHub save needed";
-  renderStatus();
-  return;
- }
- try{
-  const allowed = await ensureWritePermission(projectDirHandle);
-  if (!allowed) throw new Error("Folder write permission was not granted.");
-  const fileHandle = await projectDirHandle.getFileHandle("presets.json", {create: true});
-  const writable = await fileHandle.createWritable();
-  await writable.write(text);
-  await writable.close();
-  state.source = "Saved locally; GitHub save needed";
-  renderStatus();
- }catch(err){
-  alert("Could not save presets.json: " + err.message);
- }
+ download("presets.json", text);
+ state.source = "Downloaded JSON; GitHub save needed";
+ renderStatus();
 }
 
 function finishGithubDialog(token=null){
@@ -1391,8 +1270,6 @@ deletePresetBtn.onclick = ()=>{
  setDirty(true);
  rerenderAll();
 };
-
-connectFolderBtn.onclick = connectProjectFolder;
 
 addImageBtn.onclick = async ()=>{
  imageInput.click();
