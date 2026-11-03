@@ -330,6 +330,14 @@ button{border:1px solid var(--border);border-radius:8px;padding:8px 12px}
 .scratch-panel{border-color:#494052;margin-bottom:24px}
 .scratch-panel p{font-size:12px;color:var(--muted);line-height:1.6;margin:6px 0 0}
 #scratchInput{width:100%;min-height:145px;resize:vertical;line-height:1.7;padding:16px}
+.scratch-find{margin-top:16px;border:1px solid var(--border);border-radius:10px;padding:12px}
+.scratch-find summary{cursor:pointer;color:var(--accent);font-size:12px;font-weight:600}
+.find-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+.find-fields .field{margin:0}.find-fields input{min-width:0;font-size:12px}
+.find-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:14px}
+.find-actions .check-row{align-items:center}.find-actions .check-row input{margin:0}
+#scratchFindStatus{font-size:11px;color:var(--muted);margin-right:auto}
+@media(max-width:760px){.find-fields{grid-template-columns:1fr}}
 .scratch-note{font-size:9px;letter-spacing:1px;color:var(--accent);margin-top:12px}
 .scratch-note span{letter-spacing:0;color:var(--muted);margin-left:10px;font-size:11px}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
@@ -379,7 +387,11 @@ body.scratch-mode #librarySearch,body.scratch-mode .prompt-nav{opacity:.6}
  <main class="main-workspace">
   <header class="topbar"><div><span class="eyebrow" id="workspaceEyebrow">LIBRARY / PROMPT BUILDER</span><h1 id="workspaceTitle">Prompt workspace</h1></div><div class="right"><div class="segmented"><button id="buildModeBtn" class="active">Build prompt</button><button id="editModeBtn">Edit template</button></div><button id="copyBtn" class="btn-accent">Copy prompt</button></div></header>
   <div class="workspace-intro"><p id="workspaceDescription">Pick a template, fill in the details, and make it yours.</p><span class="pill" id="charCount">0 chars</span></div>
-  <section id="scratchPanel" class="panel scratch-panel" hidden><div class="panel-header"><div><strong>Start with any prompt</strong><p>Wrap anything you want to change in [square brackets]. Repeated variables stay in sync.</p></div><div class="toolbar"><button id="resetScratchBtn">Clear scratchpad</button><button id="saveScratchBtn" class="btn-accent" disabled>Save as template</button></div></div><div class="panel-body"><label for="scratchInput" class="sr-only">Temporary prompt source</label><textarea id="scratchInput" placeholder="Create a [style] portrait of [subject], with [lighting] lighting." spellcheck="false"></textarea><div class="scratch-note">SESSION ONLY <span>Separate from your saved templates. Kept while you switch modes; cleared when you close or reload this page.</span></div></div></section>
+  <section id="scratchPanel" class="panel scratch-panel" hidden><div class="panel-header"><div><strong>Start with any prompt</strong><p>Wrap anything you want to change in [square brackets]. Repeated variables stay in sync.</p></div><div class="toolbar"><button id="resetScratchBtn">Clear scratchpad</button><button id="saveScratchBtn" class="btn-accent" disabled>Save as template</button></div></div><div class="panel-body"><label for="scratchInput" class="sr-only">Temporary prompt source</label><textarea id="scratchInput" placeholder="Create a [style] portrait of [subject], with [lighting] lighting." spellcheck="false"></textarea><details class="scratch-find"><summary>Find and replace</summary>
+ <div class="find-fields"><div class="field"><label for="scratchFindInput">Find</label><input id="scratchFindInput" autocomplete="off" placeholder="Text to find"></div><div class="field"><label for="scratchReplaceInput">Replace with</label><input id="scratchReplaceInput" autocomplete="off" placeholder="Replacement text (leave empty to remove)"></div></div>
+ <div class="find-actions"><label class="check-row"><input id="scratchMatchCase" type="checkbox">Match case</label><span id="scratchFindStatus" role="status">Enter text to find.</span><div class="toolbar"><button id="scratchReplaceOneBtn" type="button" disabled>Replace first</button><button id="scratchReplaceAllBtn" type="button" disabled>Replace all</button></div></div>
+ <p>Searches the temporary source above, including [variables]. Use brackets in the replacement to create a variable.</p>
+ </details><div class="scratch-note">SESSION ONLY <span>Separate from your saved templates. Kept while you switch modes; cleared when you close or reload this page.</span></div></div></section>
  <section class="panel editor-panel" id="editorPanel">
   <div class="panel-header">
    <strong>Edit Library</strong>
@@ -1084,6 +1096,7 @@ function rerenderAll(){
  document.body.classList.toggle("scratch-mode", scratchMode);
  scratchPanel.hidden = !scratchMode;
  saveScratchBtn.disabled = !scratchPreset.template.trim();
+ renderScratchFind();
  libraryModeBtn.classList.toggle("active", !scratchMode);
  scratchModeBtn.classList.toggle("active", scratchMode);
  workspaceTitle.textContent = currentPreset().name;
@@ -1498,8 +1511,46 @@ let toastTimer;
 function notify(message){toast.textContent=message;toast.classList.add("visible");clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove("visible"),2200);}
 libraryModeBtn.onclick=()=>{scratchMode=false;rerenderAll();};
 scratchModeBtn.onclick=()=>{scratchMode=true;editMode=false;rerenderAll();scratchInput.focus();};
-scratchInput.oninput=()=>{scratchPreset.template=scratchInput.value;saveScratchBtn.disabled=!scratchPreset.template.trim();renderVars();renderOutput();};
-resetScratchBtn.onclick=()=>{if(scratchPreset.template && !confirm("Clear the temporary prompt and its values?"))return;scratchPreset.template="";scratchInput.value="";saveScratchBtn.disabled=true;Object.keys(scratchValues).forEach(key=>delete scratchValues[key]);renderVars();renderOutput();scratchInput.focus();};
+function refreshScratchPrompt(){
+ scratchPreset.template=scratchInput.value;
+ saveScratchBtn.disabled=!scratchPreset.template.trim();
+ renderVars();
+ renderOutput();
+ renderScratchFind();
+}
+function scratchFindPattern(){
+ const query=scratchFindInput.value;
+ if (!query) return null;
+ const escaped=query.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+ return new RegExp(escaped,scratchMatchCase.checked ? "g" : "gi");
+}
+function renderScratchFind(){
+ const pattern=scratchFindPattern();
+ const count=pattern ? [...scratchInput.value.matchAll(pattern)].length : 0;
+ scratchFindStatus.textContent=pattern ? count+ (count===1 ? " match" : " matches") : "Enter text to find.";
+ scratchReplaceOneBtn.disabled=scratchReplaceAllBtn.disabled=!scratchMode || !count;
+}
+function replaceScratchMatches(all){
+ if (!scratchMode) return;
+ const pattern=scratchFindPattern();
+ if (!pattern) return;
+ let replaced=0;
+ const next=scratchInput.value.replace(pattern,match=>{
+  if (!all && replaced) return match;
+  replaced++;
+  return scratchReplaceInput.value;
+ });
+ if (!replaced) return;
+ scratchInput.value=next;
+ refreshScratchPrompt();
+ notify(replaced+ (replaced===1 ? " replacement made" : " replacements made"));
+}
+scratchFindInput.oninput=renderScratchFind;
+scratchMatchCase.onchange=renderScratchFind;
+scratchReplaceOneBtn.onclick=()=>replaceScratchMatches(false);
+scratchReplaceAllBtn.onclick=()=>replaceScratchMatches(true);
+scratchInput.oninput=refreshScratchPrompt;
+resetScratchBtn.onclick=()=>{if(scratchPreset.template && !confirm("Clear the temporary prompt and its values?"))return;scratchPreset.template="";scratchInput.value="";saveScratchBtn.disabled=true;Object.keys(scratchValues).forEach(key=>delete scratchValues[key]);renderVars();renderOutput();renderScratchFind();scratchInput.focus();};
 saveScratchBtn.onclick=()=>{
  if (!scratchMode || !scratchPreset.template.trim()) return;
  scratchNameInput.value="";

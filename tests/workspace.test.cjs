@@ -114,3 +114,39 @@ test('cancelling save as template leaves the library unchanged',async()=>{
  assert.equal(w.eval('scratchMode'),true);
  }finally{w.close();}
 });
+
+test('temporary find and replace is literal, updates variables, and preserves the library',async()=>{
+ const dom=await studio();const w=dom.window,d=w.document;
+ try{
+ const before=w.eval('JSON.stringify(data)');
+ const stored=w.localStorage.getItem('nano_prompt_studio_values_v1');
+ d.querySelector('#scratchModeBtn').click();
+ input(w,d.querySelector('#scratchInput'),'Cat cat CAT [subject] a.b aXb $&');
+ input(w,d.querySelector('#scratchFindInput'),'cat');
+ assert.equal(d.querySelector('#scratchFindStatus').textContent,'3 matches');
+ input(w,d.querySelector('#scratchReplaceInput'),'[animal]');
+ d.querySelector('#scratchReplaceOneBtn').click();
+ assert.equal(d.querySelector('#scratchInput').value,'[animal] cat CAT [subject] a.b aXb $&');
+ assert.equal(d.querySelectorAll('#varsList input').length,2);
+ d.querySelector('#scratchMatchCase').checked=true;
+ d.querySelector('#scratchMatchCase').dispatchEvent(new w.Event('change'));
+ assert.equal(d.querySelector('#scratchFindStatus').textContent,'1 match');
+ input(w,d.querySelector('#scratchReplaceInput'),'$&');
+ d.querySelector('#scratchReplaceAllBtn').click();
+ assert.match(d.querySelector('#scratchInput').value,/\[animal\] \$& CAT/);
+ input(w,d.querySelector('#scratchFindInput'),'a.b');
+ assert.equal(d.querySelector('#scratchFindStatus').textContent,'1 match');
+ input(w,d.querySelector('#scratchReplaceInput'),'');d.querySelector('#scratchReplaceAllBtn').click();
+ assert.match(d.querySelector('#scratchInput').value,/aXb/);
+ assert.equal(d.querySelector('#scratchInput').value.includes('a.b'),false);
+ input(w,d.querySelector('#scratchFindInput'),'[subject]');
+ input(w,d.querySelector('#scratchReplaceInput'),'[lighting]');d.querySelector('#scratchReplaceAllBtn').click();
+ assert.ok([...d.querySelectorAll('#varsList label')].some(el=>el.textContent==='lighting'));
+ assert.equal(d.querySelector('#output').value,d.querySelector('#scratchInput').value);
+ assert.equal(w.eval('JSON.stringify(data)'),before);assert.equal(w.eval('dirty'),false);
+ assert.equal(w.localStorage.getItem('nano_prompt_studio_values_v1'),stored);
+ input(w,d.querySelector('#scratchFindInput'),'');
+ assert.equal(d.querySelector('#scratchReplaceAllBtn').disabled,true);
+ assert.equal(d.querySelector('#scratchFindStatus').textContent,'Enter text to find.');
+ }finally{w.close();}
+});

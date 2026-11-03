@@ -45,3 +45,7 @@ Run `npm ci` followed by `npm test` for DOM interaction checks covering temporar
 ### Save a temporary prompt as a template
 
 Choose **Save as template** in the scratchpad, enter a name and category, then select **Add to library**. The new template keeps the original bracket variables and carries over your current field values. The editor opens with the new template selected; choose **Save to GitHub** to persist it across devices and reloads. Existing templates and the scratchpad source are preserved. Cancel closes the dialog without changing the library.
+
+### Find and replace in temporary prompts
+
+Expand **Find and replace** below the temporary source. Enter literal text to find, then a replacement; leave the replacement empty to remove matches. **Replace first** changes the first occurrence and **Replace all** changes every occurrence. Search ignores case unless **Match case** is checked. The match count updates as you type. Replacements refresh variable fields and live output without changing saved templates. For example, replace `a fox` with `[subject]` to create a reusable variable.
