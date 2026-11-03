@@ -20,4 +20,28 @@ Tokens are kept only in browser session storage by default, or in that browser's
 
 If another browser has changed `presets.json` since the current edit began, the studio blocks the save instead of overwriting it. Use **Download JSON** as a backup, reload the repository version, and reapply the change.
 
-The **Connect Folder** and **Download JSON** options remain available for local backups. Saving locally does not sync the library to other machines.
+Use **Download JSON** in **Edit template** for local backups. Downloading a backup does not sync the library to other machines.
+
+
+## Redesigned workspace
+
+- Browse categories in the sidebar, or search across template names, categories and prompt text.
+- Use **Build prompt** to fill variables and see the rendered output beside them.
+- Use **Edit template** for library changes, reference-image uploads, JSON backups and GitHub sync.
+- Use **Copy prompt** or **Ctrl/Cmd + Enter** to copy the current output. Unfilled variables remain in square brackets.
+
+## Temporary prompts
+
+Select **Temporary prompt**, paste a prompt containing variables such as `[subject]`, `[style]` and `[lighting]`, then fill the detected fields. Repeated variable names share one value. Names are trimmed, so `[subject]` and `[ subject ]` use the same field.
+
+The temporary prompt and its values stay only in page memory. They survive switching back to the library, but are cleared on page reload or closure. They are only added to saved templates when you explicitly choose **Save as template**. Otherwise they are excluded from JSON exports, GitHub saves and stored library values. **Reset values** empties variable fields; **Clear scratchpad** removes the temporary source and values after confirmation.
+
+## Local development
+
+This is a buildless static app. Serve this directory with a static HTTP server, for example `python -m http.server 8765`, and open `http://localhost:8765`.
+
+Run `npm ci` followed by `npm test` for DOM interaction checks covering temporary-prompt isolation, repeated variables, reset, mode switching, library search, template edits, export isolation and clipboard feedback. These checks do not replace visual browser testing or a live GitHub write test.
+
+### Save a temporary prompt as a template
+
+Choose **Save as template** in the scratchpad, enter a name and category, then select **Add to library**. The new template keeps the original bracket variables and carries over your current field values. The editor opens with the new template selected; choose **Save to GitHub** to persist it across devices and reloads. Existing templates and the scratchpad source are preserved. Cancel closes the dialog without changing the library.

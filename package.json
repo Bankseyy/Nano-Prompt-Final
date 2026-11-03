@@ -1,0 +1,6 @@
+{
+  "name": "nano-prompt-studio",
+  "private": true,
+  "scripts": { "test": "node --test tests/workspace.test.cjs" },
+  "devDependencies": { "jsdom": "^27.4.0" }
+}
