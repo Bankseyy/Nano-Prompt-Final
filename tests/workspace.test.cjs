@@ -4,10 +4,12 @@ const fs=require('node:fs');
 const {JSDOM}=require('jsdom');
 const html=fs.readFileSync('index.html','utf8');
 const library=JSON.parse(fs.readFileSync('presets.json','utf8'));
-async function studio(){
+async function studio(options={}){
  const dom=new JSDOM(html,{url:'http://localhost/',runScripts:'dangerously',beforeParse(w){
   w.structuredClone=structuredClone;w.TextDecoder=TextDecoder;w.TextEncoder=TextEncoder;
   w.fetch=async url=>({ok:true,json:async()=>String(url).includes('api.github.com')?{sha:'test-sha',content:Buffer.from(JSON.stringify(library)).toString('base64')}:library});
+  if(options.storage) for(const [key,value] of Object.entries(options.storage))w.localStorage.setItem(key,value);
+  if(options.fetch)w.fetch=options.fetch;
   w.confirm=()=>true;
   w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
   w.HTMLDialogElement.prototype.close=function(){this.open=false;};
@@ -148,5 +150,98 @@ test('temporary find and replace is literal, updates variables, and preserves th
  input(w,d.querySelector('#scratchFindInput'),'');
  assert.equal(d.querySelector('#scratchReplaceAllBtn').disabled,true);
  assert.equal(d.querySelector('#scratchFindStatus').textContent,'Enter text to find.');
+ }finally{w.close();}
+});
+
+const draftKey='nano_prompt_studio_pending_library_v1';
+function snapshotStorage(w){return Object.fromEntries(Array.from({length:w.localStorage.length},(_,i)=>{const key=w.localStorage.key(i);return [key,w.localStorage.getItem(key)];}));}
+function remoteMock({failWrite=false,conflict=false,onWrite=null}={}){
+ let stored=structuredClone(library),sha='test-sha',writes=0;
+ return {get writes(){return writes;},get data(){return stored;},fetch:async(url,options={})=>{
+  if(options.method==='PUT'){
+   writes++;
+   if(failWrite)return {ok:false,status:403,json:async()=>({message:'Permission denied'})};
+   const body=JSON.parse(options.body);
+   stored=JSON.parse(Buffer.from(body.content,'base64').toString('utf8'));sha='saved-sha';
+   if(onWrite)await onWrite();
+   return {ok:true,json:async()=>({content:{sha}})};
+  }
+  return {ok:true,json:async()=>({sha:conflict?'other-device-sha':sha,content:Buffer.from(JSON.stringify(stored)).toString('base64')})};
+ }};
+}
+test('pending template edits survive a fresh session without a GitHub token',async()=>{
+ const first=await studio();let storage;
+ try{
+ first.window.document.querySelector('#editModeBtn').click();
+ input(first.window,first.window.document.querySelector('#editNameInput'),'Retained across sessions');
+ storage=snapshotStorage(first.window);assert.ok(storage[draftKey]);
+ }finally{first.window.close();}
+ const second=await studio({storage});
+ try{
+ assert.equal(second.window.document.querySelector('#workspaceTitle').textContent,'Retained across sessions');
+ assert.equal(second.window.eval('dirty'),true);
+ assert.match(second.window.document.querySelector('#syncStatus').textContent,/kept in this browser/);
+ assert.equal(second.window.document.querySelector('#syncSaveBtn').disabled,false);
+ }finally{second.window.close();}
+});
+test('verified GitHub save persists into a new session and clears the pending draft',async()=>{
+ const remote=remoteMock();const dom=await studio({fetch:remote.fetch});const w=dom.window;
+ let storage;
+ try{
+ w.sessionStorage.setItem('nano_prompt_studio_github_token_session_v1','test-only');
+ w.document.querySelector('#editModeBtn').click();input(w,w.document.querySelector('#editNameInput'),'Saved remotely');
+ assert.equal(await w.eval('savePresetsToGithub()'),true);assert.equal(remote.writes,1);
+ assert.equal(w.eval('dirty'),false);assert.equal(w.localStorage.getItem(draftKey),null);
+ assert.match(w.document.querySelector('#syncStatus').textContent,/verified/);storage=snapshotStorage(w);
+ }finally{w.close();}
+ const next=await studio({fetch:remote.fetch,storage});
+ try{assert.equal(next.window.eval('data.presets[0].name'),'Saved remotely');assert.equal(next.window.eval('dirty'),false);}
+ finally{next.window.close();}
+});
+test('GitHub permission failure displays an error and retains recoverable template edits',async()=>{
+ const remote=remoteMock({failWrite:true});const dom=await studio({fetch:remote.fetch});const w=dom.window;
+ try{
+ w.sessionStorage.setItem('nano_prompt_studio_github_token_session_v1','test-only');
+ w.document.querySelector('#editModeBtn').click();input(w,w.document.querySelector('#editNameInput'),'Keep despite failure');
+ assert.equal(await w.eval('savePresetsToGithub()'),false);
+ assert.equal(w.eval('dirty'),true);assert.ok(w.localStorage.getItem(draftKey));
+ assert.match(w.document.querySelector('#syncStatus').textContent,/Save failed.*403/);
+ assert.equal(w.document.querySelector('#syncSaveBtn').disabled,false);
+ }finally{w.close();}
+});
+test('restored edits keep their original base SHA and cannot overwrite another device',async()=>{
+ const first=await studio();let storage;
+ try{first.window.document.querySelector('#editModeBtn').click();input(first.window,first.window.document.querySelector('#editNameInput'),'Local edit');storage=snapshotStorage(first.window);}
+ finally{first.window.close();}
+ const remote=remoteMock({conflict:true});const next=await studio({storage,fetch:remote.fetch});const w=next.window;
+ try{
+ w.sessionStorage.setItem('nano_prompt_studio_github_token_session_v1','test-only');
+ assert.equal(await w.eval('savePresetsToGithub()'),false);assert.equal(remote.writes,0);
+ assert.match(w.document.querySelector('#syncStatus').textContent,/changed on GitHub/);
+ assert.ok(w.localStorage.getItem(draftKey));
+ }finally{w.close();}
+});
+test('changes typed during an upload remain pending instead of being replaced by the saved snapshot',async()=>{
+ let w;const remote=remoteMock({onWrite:async()=>input(w,w.document.querySelector('#editNameInput'),'Newer edit')});
+ const dom=await studio({fetch:remote.fetch});w=dom.window;
+ try{
+ w.sessionStorage.setItem('nano_prompt_studio_github_token_session_v1','test-only');
+ w.document.querySelector('#editModeBtn').click();input(w,w.document.querySelector('#editNameInput'),'Uploading snapshot');
+ assert.equal(await w.eval('savePresetsToGithub()'),true);
+ assert.equal(remote.data.presets[0].name,'Uploading snapshot');
+ assert.equal(w.eval('data.presets[0].name'),'Newer edit');assert.equal(w.eval('dirty'),true);
+ const pending=JSON.parse(w.localStorage.getItem(draftKey));assert.equal(pending.repoFileSha,'saved-sha');
+ assert.equal(pending.data.presets[0].name,'Newer edit');
+ }finally{w.close();}
+});
+test('saving a scratchpad template uploads it to GitHub rather than stopping at adding to memory',async()=>{
+ const remote=remoteMock();const dom=await studio({fetch:remote.fetch});const w=dom.window,d=w.document;
+ try{
+ w.sessionStorage.setItem('nano_prompt_studio_github_token_session_v1','test-only');
+ d.querySelector('#scratchModeBtn').click();input(w,d.querySelector('#scratchInput'),'A [subject]');
+ d.querySelector('#saveScratchBtn').click();input(w,d.querySelector('#scratchNameInput'),'Synced scratch template');
+ const event=new w.Event('submit',{cancelable:true});await d.querySelector('#saveScratchForm').onsubmit(event);
+ assert.equal(remote.writes,1);assert.equal(remote.data.presets.at(-1).name,'Synced scratch template');
+ assert.equal(w.eval('dirty'),false);assert.equal(w.localStorage.getItem(draftKey),null);
  }finally{w.close();}
 });

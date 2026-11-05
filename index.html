@@ -326,6 +326,9 @@ button{border:1px solid var(--border);border-radius:8px;padding:8px 12px}
 .editor-grid{grid-template-columns:240px minmax(0,1fr);gap:24px}
 .thumbnail{background:#141519;padding:12px}
 .workspace-footer{display:flex;justify-content:space-between;font-size:10px;color:#777985;margin-top:24px;gap:15px}
+.sync-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 16px;margin-bottom:22px;border:1px solid var(--border);border-radius:10px;background:var(--panel);font-size:12px;color:var(--muted)}
+.sync-bar[data-pending="true"]{border-color:#6e5520;color:var(--warn)}
+.sync-bar .toolbar button{font-size:12px}
 .scratch-panel[hidden]{display:none}
 .scratch-panel{border-color:#494052;margin-bottom:24px}
 .scratch-panel p{font-size:12px;color:var(--muted);line-height:1.6;margin:6px 0 0}
@@ -387,6 +390,7 @@ body.scratch-mode #librarySearch,body.scratch-mode .prompt-nav{opacity:.6}
  <main class="main-workspace">
   <header class="topbar"><div><span class="eyebrow" id="workspaceEyebrow">LIBRARY / PROMPT BUILDER</span><h1 id="workspaceTitle">Prompt workspace</h1></div><div class="right"><div class="segmented"><button id="buildModeBtn" class="active">Build prompt</button><button id="editModeBtn">Edit template</button></div><button id="copyBtn" class="btn-accent">Copy prompt</button></div></header>
   <div class="workspace-intro"><p id="workspaceDescription">Pick a template, fill in the details, and make it yours.</p><span class="pill" id="charCount">0 chars</span></div>
+  <div class="sync-bar"><span id="syncStatus" role="status"></span><div class="toolbar"><button id="syncBackupBtn" type="button">Download backup</button><button id="syncSaveBtn" class="btn-accent" type="button">Save to GitHub</button></div></div>
   <section id="scratchPanel" class="panel scratch-panel" hidden><div class="panel-header"><div><strong>Start with any prompt</strong><p>Wrap anything you want to change in [square brackets]. Repeated variables stay in sync.</p></div><div class="toolbar"><button id="resetScratchBtn">Clear scratchpad</button><button id="saveScratchBtn" class="btn-accent" disabled>Save as template</button></div></div><div class="panel-body"><label for="scratchInput" class="sr-only">Temporary prompt source</label><textarea id="scratchInput" placeholder="Create a [style] portrait of [subject], with [lighting] lighting." spellcheck="false"></textarea><details class="scratch-find"><summary>Find and replace</summary>
  <div class="find-fields"><div class="field"><label for="scratchFindInput">Find</label><input id="scratchFindInput" autocomplete="off" placeholder="Text to find"></div><div class="field"><label for="scratchReplaceInput">Replace with</label><input id="scratchReplaceInput" autocomplete="off" placeholder="Replacement text (leave empty to remove)"></div></div>
  <div class="find-actions"><label class="check-row"><input id="scratchMatchCase" type="checkbox">Match case</label><span id="scratchFindStatus" role="status">Enter text to find.</span><div class="toolbar"><button id="scratchReplaceOneBtn" type="button" disabled>Replace first</button><button id="scratchReplaceAllBtn" type="button" disabled>Replace all</button></div></div>
@@ -481,8 +485,8 @@ body.scratch-mode #librarySearch,body.scratch-mode .prompt-nav{opacity:.6}
   <p>Keep this prompt in your library with its reusable [variables]. Existing templates stay untouched.</p>
   <div class="field"><label for="scratchNameInput">Template name</label><input id="scratchNameInput" required maxlength="160" autocomplete="off" placeholder="Give your template a name"></div>
   <div class="field"><label for="scratchCategoryInput">Category</label><input id="scratchCategoryInput" list="parentOptions" autocomplete="off" placeholder="General"></div>
-  <p>Adds to the current library. Use Save to GitHub in the editor to keep it across devices and page reloads.</p>
-  <div class="dialog-actions"><button id="cancelScratchSaveBtn" type="button">Cancel</button><button class="btn-accent" type="submit">Add to library</button></div>
+  <p>Creates a new template and saves the library to GitHub. If connection or saving fails, pending edits stay in this browser until you retry.</p>
+  <div class="dialog-actions"><button id="cancelScratchSaveBtn" type="button">Cancel</button><button class="btn-accent" type="submit">Save template to GitHub</button></div>
  </form>
 </dialog>
 
@@ -519,6 +523,7 @@ body.scratch-mode #librarySearch,body.scratch-mode .prompt-nav{opacity:.6}
 </dialog>
 
 <script>
+const DRAFT_KEY = "nano_prompt_studio_pending_library_v1";
 const VALUES_KEY = "nano_prompt_studio_values_v1";
 const LEGACY_LIBRARY_KEYS = [
  "nano_prompt_studio_data_v1",
@@ -594,6 +599,8 @@ let lastImageSave = "";
 let repoFileSha = null;
 let githubDialogResolve = null;
 let saveInProgress = false;
+let syncError = "";
+let draftStored = false;
 
 function nowId(){
  return "p_" + Math.random().toString(36).slice(2,10) + "_" + Date.now().toString(36);
@@ -783,18 +790,44 @@ function saveValues(){
  }catch(err){}
 }
 
+function persistPendingLibrary(){
+ if (!dirty) return;
+ try{
+  localStorage.setItem(DRAFT_KEY,JSON.stringify({version:1,data,repoFileSha,currentId:state.currentId,activeParent:state.activeParent}));
+  draftStored=true;
+ }catch(err){draftStored=false;}
+}
+function clearPendingLibrary(){
+ try{localStorage.removeItem(DRAFT_KEY);}catch(err){}
+ draftStored=false;
+}
 async function boot(){
  loadValues();
- clearLegacyPromptLibrary();
+ let draft=null;
+ try{
+  const stored=JSON.parse(localStorage.getItem(DRAFT_KEY)||"null");
+  if (stored && stored.version===1 && stored.data && Array.isArray(stored.data.presets) && stored.data.presets.length) draft=stored;
+ }catch(err){}
  try{
   data = await loadRepoPresets();
   dirty = false;
   state.source = repoFileSha ? "GitHub presets" : "Published presets";
  }catch(err){
   data = structuredClone(DEFAULT_DATA);
-  dirty = true;
+  dirty = false;
   state.source = "Could not load library";
  }
+ if (draft){
+  // Preserve the draft's base SHA so another device's changes still block overwriting.
+  data=normalizeData(draft.data);
+  repoFileSha=draft.repoFileSha || null;
+  state.currentId=draft.currentId;
+  state.activeParent=draft.activeParent;
+  dirty=true;
+  draftStored=true;
+  state.source="Restored pending edits";
+ }
+ clearLegacyPromptLibrary();
  ensurePreset();
  rerenderAll();
 }
@@ -945,13 +978,19 @@ async function saveReferenceImage(file){
 
 function setDirty(next=true){
  dirty = next;
+ syncError="";
+ if (dirty) persistPendingLibrary();
  renderStatus();
 }
 
 function renderStatus(){
- statusPill.textContent = saveInProgress ? "Saving to GitHub…" : (dirty ? "Unsaved changes" : state.source);
+ statusPill.textContent = saveInProgress ? "Saving to GitHub..." : (dirty ? "Not saved to GitHub" : state.source);
  statusPill.className = "pill " + (dirty || saveInProgress ? "warn" : "good");
- exportBtn.disabled = saveInProgress;
+ exportBtn.disabled = syncSaveBtn.disabled = saveInProgress;
+ syncStatus.parentElement.dataset.pending=String(dirty || !!syncError);
+ syncStatus.textContent=syncError || (saveInProgress ? "Saving and checking the GitHub copy..." : dirty
+  ? (draftStored ? "Pending edits kept in this browser. Save to GitHub to sync across devices." : "Edits are not saved. Browser backup unavailable; save to GitHub or download a backup.")
+  : state.source==="Saved to GitHub" ? "Saved to GitHub and verified." : state.source==="Could not load library" ? "Library could not load. Reload before editing or saving." : "Library loaded. Template changes require Save to GitHub.");
  renderGithubConnection();
 }
 
@@ -1197,9 +1236,21 @@ async function requireGithubToken(){
 }
 
 async function savePresetsToGithub(){
- const token = await requireGithubToken();
- if (!token) return;
+ if (saveInProgress) return false;
+ if (!dirty) {notify("No pending template changes to save.");return true;}
+ persistPendingLibrary();
  saveInProgress = true;
+ syncError="";
+ renderStatus();
+ let token;
+ try{token=await requireGithubToken();}catch(err){syncError=err.message;}
+ if (!token){
+  saveInProgress=false;
+  syncError=syncError || "GitHub connection needed. Changes have not been synced; connect and save, or download a backup.";
+  renderStatus();
+  return false;
+ }
+
  renderStatus();
  try{
   const remote = await fetchGithubPresetFile(token);
@@ -1231,12 +1282,26 @@ async function savePresetsToGithub(){
   });
   if (!response.ok) throw await githubError(response, "GitHub could not save presets.json");
   const result = await response.json();
-  repoFileSha = result.content && result.content.sha ? result.content.sha : null;
-  data = normalizeData(exported);
-  state.source = "Saved to GitHub";
-  dirty = false;
+  const savedSha=result.content && result.content.sha;
+  if (!savedSha) throw new Error("GitHub did not confirm the saved file. Your pending edits are retained.");
+  repoFileSha=savedSha;
+  persistPendingLibrary();
+  const verified=await fetchGithubPresetFile(token);
+  if (verified.sha!==savedSha || JSON.stringify(verified.data.presets)!==JSON.stringify(exported.presets)){
+   throw new Error("Could not verify the saved GitHub copy. Pending edits are retained; reload only after downloading a backup.");
+  }
+  repoFileSha=savedSha;
+  const newerEdits=JSON.stringify(data.presets)!==JSON.stringify(exported.presets);
+  if (!newerEdits) data=normalizeData(exported);
+  else data.updatedAt=exported.updatedAt;
+  state.source="Saved to GitHub";
+  dirty=newerEdits;
+  if (dirty) persistPendingLibrary();
+  else clearPendingLibrary();
   clearLegacyPromptLibrary();
   rerenderAll();
+  notify(dirty ? "Saved. Newer edits still need saving." : "Saved to GitHub and verified.");
+  return true;
  }catch(err){
   if (err.status === 401){
    storeGithubToken("", false);
@@ -1244,7 +1309,9 @@ async function savePresetsToGithub(){
   const hint = err.status === 403
    ? "\n\nCheck that the token is approved and has Contents: Read and write access to Nano-Prompt-Final."
    : "";
-  alert(err.message + hint);
+  syncError="Save failed: " + err.message + hint;
+  persistPendingLibrary();
+  return false;
  }finally{
   saveInProgress = false;
   renderStatus();
@@ -1426,7 +1493,7 @@ jsonInput.onchange = e=>{
    state.currentId = data.presets[0].id;
    state.activeParent = parentOf(data.presets[0]);
    state.source = "Imported JSON; save to GitHub";
-   dirty = true;
+   setDirty(true);
    rerenderAll();
   }catch(err){
    alert("Could not import JSON: " + err.message);
@@ -1483,7 +1550,8 @@ githubForm.onsubmit = async event=>{
  }
 };
 
-exportBtn.onclick = savePresetsToGithub;
+exportBtn.onclick = syncSaveBtn.onclick = savePresetsToGithub;
+syncBackupBtn.onclick=saveLocalPresetsJson;
 downloadJsonBtn.onclick = saveLocalPresetsJson;
 
 reloadRepoBtn.onclick = async ()=>{
@@ -1494,6 +1562,8 @@ reloadRepoBtn.onclick = async ()=>{
   state.activeParent = parentOf(data.presets[0]);
   state.source = "GitHub presets";
   dirty = false;
+  syncError="";
+  clearPendingLibrary();
   clearLegacyPromptLibrary();
   rerenderAll();
  }catch(err){
@@ -1559,7 +1629,7 @@ saveScratchBtn.onclick=()=>{
  scratchNameInput.focus();
 };
 closeScratchDialogBtn.onclick=cancelScratchSaveBtn.onclick=()=>saveScratchDialog.close();
-saveScratchForm.onsubmit=event=>{
+saveScratchForm.onsubmit=async event=>{
  event.preventDefault();
  const name=scratchNameInput.value.trim();
  if (!name){scratchNameInput.setCustomValidity("Enter a template name.");scratchNameInput.reportValidity();return;}
@@ -1579,7 +1649,7 @@ saveScratchForm.onsubmit=event=>{
  setDirty(true);
  saveScratchDialog.close();
  rerenderAll();
- notify("Template added. Save to GitHub to keep it across devices.");
+ await savePresetsToGithub();
 };
 scratchNameInput.oninput=()=>scratchNameInput.setCustomValidity("");
 librarySearch.oninput=renderPresetNavigation;

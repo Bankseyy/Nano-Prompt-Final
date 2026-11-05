@@ -16,7 +16,9 @@ Tokens are kept only in browser session storage by default, or in that browser's
 
 1. Open the studio. It loads the latest `presets.json` from the `main` branch.
 2. Add or edit prompts.
-3. Select **Save to GitHub**. This creates a commit on `main` and makes the prompts available to other machines immediately.
+3. Select the always-visible **Save to GitHub** button. This creates a commit on `main`, reads the saved file back to verify it, and makes the prompts available to other machines.
+
+Template edits are also backed up automatically in this browser while pending, and restored after reopening the page. The status bar distinguishes pending browser edits from a verified GitHub save. Failed saves remain visible and keep pending edits for retry; browser-only recovery does not sync to other devices. If browser storage is unavailable, the status warns you to save or download a backup.
 
 If another browser has changed `presets.json` since the current edit began, the studio blocks the save instead of overwriting it. Use **Download JSON** as a backup, reload the repository version, and reapply the change.
 
@@ -44,7 +46,7 @@ Run `npm ci` followed by `npm test` for DOM interaction checks covering temporar
 
 ### Save a temporary prompt as a template
 
-Choose **Save as template** in the scratchpad, enter a name and category, then select **Add to library**. The new template keeps the original bracket variables and carries over your current field values. The editor opens with the new template selected; choose **Save to GitHub** to persist it across devices and reloads. Existing templates and the scratchpad source are preserved. Cancel closes the dialog without changing the library.
+Choose **Save as template** in the scratchpad, enter a name and category, then select **Save template to GitHub**. The new template keeps the original bracket variables and carries over your current field values. The editor opens with the new template selected and starts saving to GitHub automatically. Connect when prompted. If connection is cancelled or saving fails, the pending template remains backed up in this browser; use **Save to GitHub** to retry. Existing templates and the scratchpad source are preserved. Cancel closes the dialog without changing the library.
 
 ### Find and replace in temporary prompts
 
