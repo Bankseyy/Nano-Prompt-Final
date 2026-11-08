@@ -596,6 +596,8 @@ let includeReferenceInstructions = false;
 let ui = { sortMode: "appearance" };
 let state = { currentId: null, activeParent: null, source: "Loading" };
 let lastImageSave = "";
+let imageUploadInProgress = false;
+const referencePreviews = new Map();
 let repoFileSha = null;
 let githubDialogResolve = null;
 let saveInProgress = false;
@@ -928,52 +930,64 @@ function renderFolderStatus(){
 }
 
 async function saveReferenceImageToGithub(file){
- if (!file) return false;
+ if (!file || saveInProgress || scratchMode) return false;
  if (!file.type.startsWith("image/")){
-  alert("Please choose an image file.");
+  notify("Please choose an image file.");
   return false;
  }
- const token = await requireGithubToken();
- if (!token) return false;
- saveInProgress = true;
+ // Capture the destination before authentication or upload can change selection.
+ const targetId=currentPreset().id;
+ saveInProgress=true;
+ imageUploadInProgress=true;
+ syncError="";
+ lastImageSave="Uploading image...";
  renderStatus();
+ let reference=null;
  try{
-  const filename = await uniqueGithubImageFilename(file, token);
-  const reference = "images/" + filename;
-  const response = await fetch(githubApiUrl(reference, false), {
-   method: "PUT",
-   headers: {
-    ...githubHeaders(token),
-    "Content-Type": "application/json"
-   },
-   body: JSON.stringify({
-    message: "Add reference image " + filename,
-    content: await encodeFileBase64(file),
-    branch: GITHUB_BRANCH
-   })
+  const token=await requireGithubToken();
+  if (!token){lastImageSave="Image not uploaded. Connect GitHub and try Add Image again.";return false;}
+  const filename=await uniqueGithubImageFilename(file,token);
+  reference="images/"+filename;
+  const response=await fetch(githubApiUrl(reference,false),{
+   method:"PUT",
+   headers:{...githubHeaders(token),"Content-Type":"application/json"},
+   body:JSON.stringify({message:"Add reference image "+filename,content:await encodeFileBase64(file),branch:GITHUB_BRANCH})
   });
-  if (!response.ok) throw await githubError(response, "GitHub could not upload the reference image");
-  lastImageSave = "Uploaded: " + reference;
-  updateCurrentPreset({reference});
-  state.source = "Image uploaded; save prompt";
-  renderFolderStatus();
-  return true;
+  if (!response.ok) throw await githubError(response,"GitHub could not upload the reference image");
+  const uploaded=await response.json();
+  const imageSha=uploaded.content?.sha;
+  if (!imageSha) throw new Error("GitHub did not confirm the uploaded image.");
+  const checked=await fetch(githubApiUrl(reference),{headers:githubHeaders(token),cache:"no-store"});
+  if (!checked.ok) throw await githubError(checked,"Could not verify the uploaded image");
+  if ((await checked.json()).sha!==imageSha) throw new Error("Uploaded image verification failed.");
+  const target=data.presets.find(p=>p.id===targetId);
+  if (!target) throw new Error("Image uploaded, but the destination template was removed. The image is at "+reference);
+  target.reference=reference;
+  setDirty(true);
+  const oldPreview=referencePreviews.get(targetId);
+  if (oldPreview) URL.revokeObjectURL(oldPreview.url);
+  referencePreviews.set(targetId,{reference,url:URL.createObjectURL(file)});
+  lastImageSave="Image uploaded. Saving the template link...";
+  if (!scratchMode && state.currentId===targetId){editRefInput.value=reference;renderReference();}
  }catch(err){
-  if (err.status === 401) storeGithubToken("", false);
-  const hint = err.status === 403
-   ? "\n\nCheck that the token has Contents: Read and write access to Nano-Prompt-Final."
-   : "";
-  alert(err.message + hint);
-  renderFolderStatus();
+  if (err.status===401) storeGithubToken("",false);
+  const hint=err.status===403 ? " Check the token has Contents: Read and write access to Nano-Prompt-Final." : "";
+  lastImageSave="Image save failed: "+err.message+hint;
+  syncError=lastImageSave;
   return false;
  }finally{
-  saveInProgress = false;
+  saveInProgress=false;
+  imageUploadInProgress=false;
   renderStatus();
  }
+ const saved=await savePresetsToGithub();
+ lastImageSave=saved ? "Image and template saved to GitHub: "+reference : "Image uploaded; template link still pending. Use Save to GitHub to retry.";
+ renderFolderStatus();
+ return saved;
 }
 
 async function saveReferenceImage(file){
- await saveReferenceImageToGithub(file);
+ return await saveReferenceImageToGithub(file);
 }
 
 function setDirty(next=true){
@@ -987,8 +1001,9 @@ function renderStatus(){
  statusPill.textContent = saveInProgress ? "Saving to GitHub..." : (dirty ? "Not saved to GitHub" : state.source);
  statusPill.className = "pill " + (dirty || saveInProgress ? "warn" : "good");
  exportBtn.disabled = syncSaveBtn.disabled = saveInProgress;
+ renderFolderStatus();
  syncStatus.parentElement.dataset.pending=String(dirty || !!syncError);
- syncStatus.textContent=syncError || (saveInProgress ? "Saving and checking the GitHub copy..." : dirty
+ syncStatus.textContent=syncError || (saveInProgress ? (imageUploadInProgress ? "Uploading and checking the reference image..." : "Saving and checking the GitHub copy...") : dirty
   ? (draftStored ? "Pending edits kept in this browser. Save to GitHub to sync across devices." : "Edits are not saved. Browser backup unavailable; save to GitHub or download a backup.")
   : state.source==="Saved to GitHub" ? "Saved to GitHub and verified." : state.source==="Could not load library" ? "Library could not load. Reload before editing or saving." : "Library loaded. Template changes require Save to GitHub.");
  renderGithubConnection();
@@ -1092,12 +1107,20 @@ function renderOutput(){
  autoGrow(output);
 }
 
+function referenceImageUrl(p){
+ const preview=referencePreviews.get(p.id);
+ if (preview?.reference===p.reference) return preview.url;
+ if (String(p.reference || "").startsWith("images/")){
+  return "https://raw.githubusercontent.com/"+GITHUB_OWNER+"/"+GITHUB_REPO+"/"+GITHUB_BRANCH+"/"+p.reference.split("/").map(encodeURIComponent).join("/");
+ }
+ return p.reference;
+}
 function renderReference(){
  const p = currentPreset();
  if (p.reference){
   thumb.style.display = "block";
   thumbImg.onerror = ()=>{ thumb.style.display = "none"; };
-  thumbImg.src = p.reference;
+  thumbImg.src = referenceImageUrl(p);
   downloadRefBtn.disabled = false;
  } else {
   thumb.style.display = "none";
@@ -1373,7 +1396,7 @@ downloadRefBtn.onclick = ()=>{
  const p = currentPreset();
  if (!p.reference) return;
  const a = document.createElement("a");
- a.href = p.reference;
+ a.href = referenceImageUrl(p);
  a.download = p.reference.split("/").pop() || "reference";
  a.click();
 };

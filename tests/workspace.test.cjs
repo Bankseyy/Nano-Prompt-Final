@@ -245,3 +245,63 @@ test('saving a scratchpad template uploads it to GitHub rather than stopping at 
  assert.equal(w.eval('dirty'),false);assert.equal(w.localStorage.getItem(draftKey),null);
  }finally{w.close();}
 });
+function imageRemote({failTemplateSave=false,onImageUpload=null,failImage=false}={}){
+ const templates=remoteMock({failWrite:failTemplateSave});let uploaded=false;
+ return {templates,fetch:async(url,options={})=>{
+  if(!String(url).includes('/contents/images/'))return templates.fetch(url,options);
+  if(options.method==='PUT'){
+   if(failImage)return {ok:false,status:403,json:async()=>({message:'Image write denied'})};
+   uploaded=true;if(onImageUpload)await onImageUpload();
+   return {ok:true,json:async()=>({content:{sha:'image-sha'}})};
+  }
+  return uploaded ? {ok:true,json:async()=>({sha:'image-sha'})} : {ok:false,status:404};
+ }};
+}
+const imageFile=()=>({name:'reference.png',type:'image/png',arrayBuffer:async()=>Uint8Array.from([137,80,78,71]).buffer});
+function imageSession(w){w.sessionStorage.setItem('nano_prompt_studio_github_token_session_v1','test-only');w.URL.createObjectURL=()=> 'blob:immediate-reference';w.URL.revokeObjectURL=()=>{};}
+test('Add Image saves both the file and its template link and survives another session',async()=>{
+ const remote=imageRemote();const dom=await studio({fetch:remote.fetch});const w=dom.window;
+ try{
+ imageSession(w);assert.equal(await w.saveReferenceImage(imageFile()),true);
+ assert.equal(remote.templates.writes,1);assert.equal(remote.templates.data.presets[0].reference,'images/reference.png');
+ assert.equal(w.document.querySelector('#thumbImg').src,'blob:immediate-reference');
+ assert.equal(w.eval('dirty'),false);assert.equal(w.localStorage.getItem(draftKey),null);
+ assert.match(w.document.querySelector('#folderStatus').textContent,/Image and template saved/);
+ }finally{w.close();}
+ const next=await studio({fetch:remote.fetch});
+ try{
+ assert.match(next.window.document.querySelector('#thumbImg').src,/raw\.githubusercontent\.com\/Bankseyy\/Nano-Prompt-Final\/main\/images\/reference\.png/);
+ assert.equal(next.window.document.querySelector('#thumb').style.display,'block');
+ }finally{next.window.close();}
+});
+test('image upload keeps its original destination if selection changes while uploading',async()=>{
+ let w;const remote=imageRemote({onImageUpload:async()=>{w.eval('state.currentId=data.presets[1].id;state.activeParent=parentOf(data.presets[1]);rerenderAll();');}});
+ const dom=await studio({fetch:remote.fetch});w=dom.window;
+ try{
+ imageSession(w);const untouched=w.eval('data.presets[1].reference');
+ assert.equal(await w.saveReferenceImage(imageFile()),true);
+ assert.equal(remote.templates.data.presets[0].reference,'images/reference.png');
+ assert.equal(remote.templates.data.presets[1].reference,untouched);
+ }finally{w.close();}
+});
+test('failed template save retains the uploaded image link for retry',async()=>{
+ const remote=imageRemote({failTemplateSave:true});const dom=await studio({fetch:remote.fetch});const w=dom.window;
+ try{
+ imageSession(w);assert.equal(await w.saveReferenceImage(imageFile()),false);
+ assert.equal(w.eval('dirty'),true);
+ assert.equal(JSON.parse(w.localStorage.getItem(draftKey)).data.presets[0].reference,'images/reference.png');
+ assert.match(w.document.querySelector('#folderStatus').textContent,/template link still pending/);
+ assert.match(w.document.querySelector('#syncStatus').textContent,/Save failed/);
+ assert.equal(w.document.querySelector('#addImageBtn').disabled,false);
+ }finally{w.close();}
+});
+test('image upload failure leaves the original reference unchanged and displays its error',async()=>{
+ const remote=imageRemote({failImage:true});const dom=await studio({fetch:remote.fetch});const w=dom.window;
+ try{
+ imageSession(w);const before=w.eval('JSON.stringify(data)');
+ assert.equal(await w.saveReferenceImage(imageFile()),false);
+ assert.equal(w.eval('JSON.stringify(data)'),before);assert.equal(remote.templates.writes,0);
+ assert.match(w.document.querySelector('#folderStatus').textContent,/Image write denied/);
+ assert.equal(w.document.querySelector('#addImageBtn').disabled,false);
+ }finally{w.close();}
+});

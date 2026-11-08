@@ -51,3 +51,7 @@ Choose **Save as template** in the scratchpad, enter a name and category, then s
 ### Find and replace in temporary prompts
 
 Expand **Find and replace** below the temporary source. Enter literal text to find, then a replacement; leave the replacement empty to remove matches. **Replace first** changes the first occurrence and **Replace all** changes every occurrence. Search ignores case unless **Match case** is checked. The match count updates as you type. Replacements refresh variable fields and live output without changing saved templates. For example, replace `a fox` with `[subject]` to create a reusable variable.
+
+### Reference image saving
+
+**Add Image** uploads and verifies the image, then automatically saves and verifies its template link in `presets.json`. The preview appears immediately below the variables. Reopened sessions load repository image URLs directly without waiting for a GitHub Pages rebuild. The image stays attached to the template selected when the upload started. If the template save fails, its image link stays in the pending browser draft; use **Save to GitHub** to retry without uploading the image again. Upload errors appear in Image Storage and the sync bar.
