@@ -55,3 +55,5 @@ Expand **Find and replace** below the temporary source. Enter literal text to fi
 ### Reference image saving
 
 **Add Image** uploads and verifies the image, then automatically saves and verifies its template link in `presets.json`. The preview appears immediately below the variables. Reopened sessions load repository image URLs directly without waiting for a GitHub Pages rebuild. The image stays attached to the template selected when the upload started. If the template save fails, its image link stays in the pending browser draft; use **Save to GitHub** to retry without uploading the image again. Upload errors appear in Image Storage and the sync bar.
+
+The **Reference image** button fetches the original image and downloads it as a local file with its filename, rather than navigating to the image URL. Download failures show a message and keep the workspace open.

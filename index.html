@@ -597,6 +597,7 @@ let ui = { sortMode: "appearance" };
 let state = { currentId: null, activeParent: null, source: "Loading" };
 let lastImageSave = "";
 let imageUploadInProgress = false;
+let referenceDownloadInProgress = false;
 const referencePreviews = new Map();
 let repoFileSha = null;
 let githubDialogResolve = null;
@@ -1121,7 +1122,7 @@ function renderReference(){
   thumb.style.display = "block";
   thumbImg.onerror = ()=>{ thumb.style.display = "none"; };
   thumbImg.src = referenceImageUrl(p);
-  downloadRefBtn.disabled = false;
+  downloadRefBtn.disabled = referenceDownloadInProgress;
  } else {
   thumb.style.display = "none";
   thumbImg.removeAttribute("src");
@@ -1392,13 +1393,45 @@ selectAllBtn.onclick = selectOutput;
 copyBtn.onclick = copyOutput;
 copyBtn2.onclick = copyOutput;
 
-downloadRefBtn.onclick = ()=>{
+downloadRefBtn.onclick = async ()=>{
  const p = currentPreset();
- if (!p.reference) return;
- const a = document.createElement("a");
- a.href = referenceImageUrl(p);
- a.download = p.reference.split("/").pop() || "reference";
- a.click();
+ if (!p.reference || referenceDownloadInProgress) return;
+ const source=referenceImageUrl(p);
+ let filename="reference-image";
+ try{
+  const name=new URL(p.reference,location.href).pathname.split("/").pop();
+  if (name) filename=decodeURIComponent(name).replace(/[\\/]/g,"_");
+ }catch(err){}
+ referenceDownloadInProgress=true;
+ const previousLabel=downloadRefBtn.textContent;
+ downloadRefBtn.textContent="Downloading...";
+ downloadRefBtn.disabled=true;
+ try{
+  // Cross-origin links can ignore download. A local blob URL downloads the file
+  // rather than navigating, including for freshly uploaded reference previews.
+  const response=await fetch(source);
+  if (!response.ok) throw new Error("Image request failed (HTTP "+response.status+").");
+  const blob=await response.blob();
+  if (!blob.size) throw new Error("The image file is empty.");
+  const url=URL.createObjectURL(blob);
+  try{
+   const a=document.createElement("a");
+   a.href=url;
+   a.download=filename;
+   document.body.appendChild(a);
+   a.click();
+   a.remove();
+  }finally{
+   setTimeout(()=>URL.revokeObjectURL(url),30000);
+  }
+  notify("Image download started.");
+ }catch(err){
+  notify("Image download failed: "+err.message);
+ }finally{
+  referenceDownloadInProgress=false;
+  downloadRefBtn.textContent=previousLabel;
+  renderReference();
+ }
 };
 
 editNameInput.oninput = ()=>{

@@ -305,3 +305,42 @@ test('image upload failure leaves the original reference unchanged and displays 
  assert.equal(w.document.querySelector('#addImageBtn').disabled,false);
  }finally{w.close();}
 });
+
+test('reference image downloads original bytes with its filename through a local blob URL',async()=>{
+ for(const fresh of [false,true]){
+  const dom=await studio();const w=dom.window,d=w.document;let downloaded,clicked,requested,cleanup;
+  try{
+   w.eval('data.presets[0].reference="images/my%20reference.png";renderReference();');
+   if(fresh)w.eval('referencePreviews.set(data.presets[0].id,{reference:data.presets[0].reference,url:"blob:fresh-upload"});');
+   const before=w.eval('JSON.stringify(data)');
+   const bytes=Uint8Array.from([137,80,78,71,0,255,42]);
+   const originalBlob=new Blob([bytes],{type:'image/png'});
+   w.fetch=async source=>{requested=source;return {ok:true,blob:async()=>originalBlob};};
+   w.URL.createObjectURL=blob=>{downloaded=blob;return 'blob:download-file';};
+   w.URL.revokeObjectURL=()=>{};
+   w.HTMLAnchorElement.prototype.click=function(){clicked={href:this.href,name:this.download,attached:this.isConnected};};
+   const nativeTimer=w.setTimeout.bind(w);
+   w.setTimeout=(fn,ms)=>{if(ms===30000){cleanup=fn;return 1;}return nativeTimer(fn,ms);};
+   await d.querySelector('#downloadRefBtn').onclick();
+   assert.equal(clicked.href,'blob:download-file');assert.equal(clicked.name,'my reference.png');assert.equal(clicked.attached,true);
+   assert.deepEqual(new Uint8Array(await downloaded.arrayBuffer()),bytes);
+   assert.equal(requested,fresh?'blob:fresh-upload':'https://raw.githubusercontent.com/Bankseyy/Nano-Prompt-Final/main/images/my%2520reference.png');
+   assert.equal(d.querySelectorAll('a[download]').length,0);assert.equal(typeof cleanup,'function');
+   assert.equal(w.location.href,'http://localhost/');assert.equal(w.eval('JSON.stringify(data)'),before);
+   assert.equal(d.querySelector('#downloadRefBtn').disabled,false);
+  }finally{w.close();}
+ }
+});
+test('failed image download shows an error without opening the image URL',async()=>{
+ const dom=await studio();const w=dom.window,d=w.document;let clicks=0;
+ try{
+ w.eval('data.presets[0].reference="images/reference.jpg";renderReference();');
+ w.fetch=async()=>({ok:false,status:404});
+ w.HTMLAnchorElement.prototype.click=()=>{clicks++;};
+ await d.querySelector('#downloadRefBtn').onclick();
+ assert.equal(clicks,0);assert.equal(w.location.href,'http://localhost/');
+ assert.match(d.querySelector('#toast').textContent,/Image download failed.*404/);
+ assert.equal(d.querySelector('#downloadRefBtn').disabled,false);
+ assert.equal(d.querySelector('#downloadRefBtn').textContent,'Reference image');
+ }finally{w.close();}
+});
