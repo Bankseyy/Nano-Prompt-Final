@@ -344,3 +344,62 @@ test('failed image download shows an error without opening the image URL',async(
  assert.equal(d.querySelector('#downloadRefBtn').textContent,'Reference image');
  }finally{w.close();}
 });
+
+test('editing a parent group commits on input and the chosen group survives save and reopen',async()=>{
+ const remote=remoteMock();const dom=await studio({fetch:remote.fetch});const w=dom.window,d=w.document;let id;
+ try{
+ w.sessionStorage.setItem('nano_prompt_studio_github_token_session_v1','test-only');
+ d.querySelector('#editModeBtn').click();id=w.eval('currentPreset().id');
+ const originalParent=w.eval('parentOf(currentPreset())');
+ input(w,d.querySelector('#editParentInput'),'New parent group');
+ assert.equal(w.eval('currentPreset().id'),id);
+ assert.equal(w.eval('currentPreset().parent'),'New parent group');
+ assert.equal(d.querySelector('#editParentInput').value,'New parent group');
+ assert.equal(w.eval('state.activeParent'),'New parent group');
+ assert.equal(JSON.parse(w.localStorage.getItem(draftKey)).data.presets.find(p=>p.id===id).parent,'New parent group');
+ assert.ok([...d.querySelectorAll('#parentStrip button')].some(el=>el.textContent.startsWith('New parent group')));
+ d.querySelector('#editParentSelect').value=originalParent;
+ d.querySelector('#editParentSelect').dispatchEvent(new w.Event('change'));
+ assert.equal(w.eval('currentPreset().parent'),originalParent);
+ input(w,d.querySelector('#editParentInput'),'New parent group');
+ assert.equal(await w.savePresetsToGithub(),true);
+ assert.equal(remote.data.presets.find(p=>p.id===id).parent,'New parent group');
+ }finally{w.close();}
+ const next=await studio({fetch:remote.fetch});
+ try{assert.equal(next.window.eval('data.presets.find(p=>p.id==='+JSON.stringify(id)+').parent'),'New parent group');}
+ finally{next.window.close();}
+});
+test('a new blank template can choose an existing parent and create another parent without switching templates',async()=>{
+ const dom=await studio();const w=dom.window,d=w.document;
+ try{
+ d.querySelector('#editModeBtn').click();d.querySelector('#addPresetBtn').click();
+ const id=w.eval('currentPreset().id');
+ const savedOption=[...d.querySelector('#editParentSelect').options].find(o=>o.value);
+ d.querySelector('#editParentSelect').value=savedOption.value;
+ d.querySelector('#editParentSelect').dispatchEvent(new w.Event('change'));
+ assert.equal(w.eval('currentPreset().parent'),savedOption.value);
+ input(w,d.querySelector('#editParentInput'),'Fresh collection');
+ input(w,d.querySelector('#editNameInput'),'New in collection');
+ input(w,d.querySelector('#editTemplateInput'),'Draw [subject]');
+ assert.equal(w.eval('currentPreset().id'),id);assert.equal(w.eval('currentPreset().parent'),'Fresh collection');
+ assert.equal(w.eval('buildExportObject().presets.at(-1).parent'),'Fresh collection');
+ }finally{w.close();}
+});
+test('Save as template provides parent choices inside the modal and saves a new group',async()=>{
+ const remote=remoteMock();const dom=await studio({fetch:remote.fetch});const w=dom.window,d=w.document;
+ try{
+ w.sessionStorage.setItem('nano_prompt_studio_github_token_session_v1','test-only');
+ const original=w.eval('JSON.stringify(data.presets)');
+ d.querySelector('#scratchModeBtn').click();input(w,d.querySelector('#scratchInput'),'Test [subject]');
+ d.querySelector('#saveScratchBtn').click();
+ const select=d.querySelector('#scratchCategorySelect');
+ assert.equal(select.closest('dialog').open,true);assert.ok(select.options.length>1);
+ select.value=select.options[1].value;select.dispatchEvent(new w.Event('change'));
+ assert.equal(d.querySelector('#scratchCategoryInput').value,select.value);
+ input(w,d.querySelector('#scratchCategoryInput'),'Scratch collection');
+ input(w,d.querySelector('#scratchNameInput'),'Grouped temporary template');
+ await d.querySelector('#saveScratchForm').onsubmit(new w.Event('submit',{cancelable:true}));
+ assert.equal(remote.data.presets.at(-1).parent,'Scratch collection');
+ assert.equal(w.eval('JSON.stringify(data.presets.slice(0,-1))'),original);
+ }finally{w.close();}
+});

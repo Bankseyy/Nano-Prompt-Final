@@ -423,9 +423,9 @@ body.scratch-mode #librarySearch,body.scratch-mode .prompt-nav{opacity:.6}
       <input id="editNameInput" autocomplete="off">
      </div>
      <div class="field">
-      <label for="editParentInput">Parent</label>
-      <input id="editParentInput" list="parentOptions" placeholder="General" autocomplete="off">
-      <datalist id="parentOptions"></datalist>
+      <label for="editParentSelect">Parent group</label>
+      <select id="editParentSelect" aria-label="Choose an existing parent group"></select>
+      <input id="editParentInput" aria-label="Parent group name" placeholder="Or type a new group name" autocomplete="off">
      </div>
      <div class="field">
       <label for="editRefInput">Reference Image Path</label>
@@ -484,7 +484,7 @@ body.scratch-mode #librarySearch,body.scratch-mode .prompt-nav{opacity:.6}
  <form id="saveScratchForm" class="dialog-body">
   <p>Keep this prompt in your library with its reusable [variables]. Existing templates stay untouched.</p>
   <div class="field"><label for="scratchNameInput">Template name</label><input id="scratchNameInput" required maxlength="160" autocomplete="off" placeholder="Give your template a name"></div>
-  <div class="field"><label for="scratchCategoryInput">Category</label><input id="scratchCategoryInput" list="parentOptions" autocomplete="off" placeholder="General"></div>
+  <div class="field"><label for="scratchCategorySelect">Parent group</label><select id="scratchCategorySelect" aria-label="Choose a parent group for the new template"></select><input id="scratchCategoryInput" aria-label="New template parent group name" autocomplete="off" placeholder="Or type a new group name"></div>
   <p>Creates a new template and saves the library to GitHub. If connection or saving fails, pending edits stay in this browser until you retry.</p>
   <div class="dialog-actions"><button id="cancelScratchSaveBtn" type="button">Cancel</button><button class="btn-accent" type="submit">Save template to GitHub</button></div>
  </form>
@@ -876,11 +876,20 @@ function presetsInParent(parent){
 }
 
 function renderParentOptions(){
- parentOptions.innerHTML = "";
- allParents().forEach(parent=>{
-  const option = document.createElement("option");
-  option.value = parent;
-  parentOptions.appendChild(option);
+ const parents = allParents();
+ [[editParentSelect, editParentInput.value], [scratchCategorySelect, scratchCategoryInput.value]].forEach(([select, current])=>{
+  select.replaceChildren();
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Choose a group or enter a name below";
+  select.appendChild(placeholder);
+  parents.forEach(parent=>{
+   const option = document.createElement("option");
+   option.value = parent;
+   option.textContent = parent;
+   select.appendChild(option);
+  });
+  select.value = parents.includes(cleanParent(current)) ? cleanParent(current) : "";
  });
 }
 
@@ -1438,10 +1447,26 @@ editNameInput.oninput = ()=>{
  updateCurrentPreset({name: editNameInput.value.trim() || "Untitled"});
 };
 
-editParentInput.onchange = ()=>{
+editParentInput.oninput = ()=>{
  updateCurrentPreset({parent: editParentInput.value});
- rerenderAll();
+ workspaceEyebrow.textContent = "LIBRARY / " + parentOf(currentPreset()).toUpperCase();
+ renderParentOptions();
 };
+editParentInput.onchange = ()=>{
+ editParentInput.oninput();
+ editParentInput.value = parentOf(currentPreset());
+ renderParentOptions();
+};
+editParentSelect.onchange = ()=>{
+ if (!editParentSelect.value){editParentInput.focus();editParentInput.select();return;}
+ editParentInput.value = editParentSelect.value;
+ editParentInput.oninput();
+};
+scratchCategorySelect.onchange = ()=>{
+ if (!scratchCategorySelect.value){scratchCategoryInput.focus();scratchCategoryInput.select();return;}
+ scratchCategoryInput.value = scratchCategorySelect.value;
+};
+scratchCategoryInput.oninput = renderParentOptions;
 
 editRefInput.oninput = ()=>{
  updateCurrentPreset({reference: editRefInput.value.trim() || null});
@@ -1681,6 +1706,7 @@ saveScratchBtn.onclick=()=>{
  if (!scratchMode || !scratchPreset.template.trim()) return;
  scratchNameInput.value="";
  scratchCategoryInput.value=cleanParent(state.activeParent);
+ renderParentOptions();
  saveScratchDialog.showModal();
  scratchNameInput.focus();
 };
